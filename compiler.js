@@ -23,7 +23,9 @@ function compile(solFilePath) {
             },
         },
     };
-    const tempFile = JSON.parse(solc.compile(JSON.stringify(input)));
+    const compiled = solc.compile(JSON.stringify(input));
+    console.log(compiled);
+    const tempFile = JSON.parse(compiled);
     if (tempFile.errors) {
         const error = tempFile.errors[0];
         const errorCode = error['code'];
@@ -62,6 +64,7 @@ async function deploy(contractFile) {
         arguments: [],
     });
 
+    console.log(contractTx.encodeABI());
     const createTransaction = await web3.eth.accounts.signTransaction(
         {
             from: address,

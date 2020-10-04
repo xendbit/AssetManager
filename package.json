@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon index.js",
-    "build_assets": "/usr/local/bin/solcjs --base-path ./contracts/assets -o ./contracts/assets/output --bin --abi ./contracts/assets/classes/AssetManager.sol"
+    "build_assets": "rm -rf ./contracts/assets/output && /usr/local/bin/solcjs --base-path ./contracts/assets -o ./contracts/assets/output --bin --abi --optimize ./contracts/assets/classes/AssetManager.sol"
   },
   "author": "Akintayo Olusegun",
   "license": "ISC",

@@ -2,24 +2,127 @@
 pragma solidity ^0.7.2;
 pragma experimental ABIEncoderV2;
 
-import './SafeMath.sol';
-import '../models/Asset.sol';
-import '../models/Order.sol';
-import '../interfaces/IAssetManager.sol';
+contract AssetManager {        
+    event AssetCreated(Asset asset);
+    event OrderPosted(Order order);
+    event OrderBought(Order order);
+    event OrderSold(Order order);
 
-contract AssetManager is IAssetManager {
-    using SafeMath for uint;
+    enum OrderType {BUY, SELL}
+    
+    struct Order {
+        uint256 id;
+        OrderType orderType;
+        address seller;
+        address buyer;
+        uint256 assetId;
+        uint256 amount;
+        uint256 price;
+        bool matched;
+    }
+
+    struct OrderRequest {
+        OrderType orderType;
+        uint256 amount;
+        uint256 price;
+        uint256 assetId;
+    }
+
+    function _cloneOrder(Order memory o) private pure returns (Order memory) {
+        Order memory newOrder = Order({
+            id: o.id,
+            orderType: o.orderType,
+            seller: o.seller,
+            buyer: o.buyer,
+            assetId: o.assetId,
+            amount: o.amount,
+            price: o.price,
+            matched: o.matched            
+        });
+
+        return newOrder;
+    }
+
+    function _copyOrder(Order memory a, Order memory b) private pure {
+        b.id = a.id;
+        b.orderType = a.orderType;
+        b.seller = a.seller;
+        b.buyer = a.buyer;
+        b.assetId = a.assetId;
+        b.amount = a.amount;
+        b.price = a.price;
+        b.matched = a.matched;        
+    }
+
+    function _validateOrder(OrderRequest memory order) private pure {
+        require(order.assetId > 0);
+        require(order.amount > 0);
+        require(order.price > 0);
+    }
+
+    struct Asset {
+        uint256 id;
+        string name;
+        string description;
+        uint256 totalQuantity;
+        uint256 quantity;
+        uint256 decimal;
+        address issuer;
+        address owner;
+    }
+
+    struct AssetRequest {
+        string name;
+        string description;
+        uint256 totalQuantity;
+        uint256 decimal;
+    }
+
+    function _cloneAsset(Asset memory a) private pure returns (Asset memory) {
+        Asset memory newAsset = Asset({
+            id: a.id,
+            name: a.name,
+            description: a.description,
+            totalQuantity: a.totalQuantity,
+            quantity: a.quantity,
+            decimal: a.decimal,
+            issuer: a.issuer,
+            owner: a.owner
+        });
+
+        return newAsset;
+    }
+
+    // copy a into b
+    function _copyAsset(Asset memory a, Asset memory b) private pure {
+        b.id = a.id;
+        b.name = a.name;
+        b.description = a.description;
+        b.totalQuantity = a.totalQuantity;
+        b.quantity = a.quantity;
+        b.decimal = a.decimal;
+        b.issuer = a.issuer;
+        b.owner = a.owner;
+    }
+
+    function _validateAsset(AssetRequest memory asset) private pure {
+        bytes memory b = bytes(asset.name);
+        require(b.length > 0);
+        require(asset.totalQuantity > 0);
+        require(asset.decimal >= 0);
+    }
+
     // Store All Assets. Key is Asset Id
-    mapping (uint => AssetModel.Asset) public assets;
+    mapping (uint => Asset) public assets;
     uint lastAssetId;
 
     // Store All Orders. Key is Order ID
-    mapping (uint => OrderModel.Order) public orders;
+    mapping (uint => Order) public orders;
     uint lastOrderId;
     
     constructor() {
         lastAssetId = 0;
-        assets[0] = AssetModel.Asset({
+        assets[0] = Asset({
             id: 0,
             name: '__INIT__',
             description: 'INIT ASSET',
@@ -30,9 +133,9 @@ contract AssetManager is IAssetManager {
             owner: address(0)
         });
 
-        orders[0] = OrderModel.Order({
+        orders[0] = Order({
             id: 0,
-            orderType: OrderModel.OrderType.SELL,
+            orderType: OrderType.SELL,
             seller: address(0),
             buyer: address(0),
             assetId: 0,
@@ -43,32 +146,31 @@ contract AssetManager is IAssetManager {
         lastOrderId = 0;
     }
     
-    function createAsset(AssetModel.AssetRequest memory assetRequest) public override {
-        AssetModel.validateAsset(assetRequest);  
-        uint lai = lastAssetId.add(1);
-        AssetModel.Asset memory asset = AssetModel.Asset({
+    function createAsset(AssetRequest memory assetRequest) public {
+        _validateAsset(assetRequest);  
+        uint lai = add(1, lastAssetId);
+        Asset memory asset = Asset({
             id: lai,
             name: assetRequest.name,
             description: assetRequest.description,
             totalQuantity: assetRequest.totalQuantity,
-            quantity: 0,
+            quantity: assetRequest.totalQuantity,,
             decimal: assetRequest.decimal,
             issuer: msg.sender,
-            owner: address(0)
-
+            owner: msg.sender
         });
         assets[lai] = asset;
         lastAssetId = lai;
 
         emit AssetCreated(asset);
-    }   
+    } 
 
-    function postOrder(OrderModel.OrderRequest memory orderRequest) public override {
-        OrderModel.validateOrder(orderRequest);
+    function postOrder(OrderRequest memory orderRequest) public {
+        _validateOrder(orderRequest);
         address seller;
         address buyer;
-        uint loi = lastOrderId.add(1);
-        if(orderRequest.orderType == OrderModel.OrderType.BUY) {
+        uint loi = add(1, lastOrderId);
+        if(orderRequest.orderType == OrderType.BUY) {
             buyer = msg.sender;
             seller = address(0);
         } else {
@@ -76,7 +178,7 @@ contract AssetManager is IAssetManager {
             seller = msg.sender;            
         }
 
-        OrderModel.Order memory matchingOrder = OrderModel.Order({
+        Order memory matchingOrder = Order({
             id: loi,
             orderType: orderRequest.orderType,
             seller: seller,
@@ -92,153 +194,170 @@ contract AssetManager is IAssetManager {
         lastOrderId = loi;
 
         // try and match the matchingOrder with previously posted orders
-        _matchOrder(matchingOrder);        
+        //_matchOrder(matchingOrder);        
         emit OrderPosted(matchingOrder);
     }
 
-    function _matchOrder(OrderModel.Order memory matchingOrder) public override {
-        //for(uint i = 0; i < lastOrderId; i = i.add(1)) {            
-        uint i = 1;
-        uint loi = lastOrderId;
-        bool matched = false;
-        while(i < loi && !matched) {            
-            OrderModel.Order memory toMatch = orders[i];
-            //if it's the same asset and it's not previously matched
-            if(matchingOrder.assetId != toMatch.assetId && toMatch.matched == false) {         
-                if(matchingOrder.orderType == OrderModel.OrderType.BUY) {
-                    OrderModel.Order memory buyOrder = matchingOrder;
-                    OrderModel.Order memory sellOrder = toMatch;
-                    if(buyOrder.price >= sellOrder.price) {
-                        // check if seller can fufil all the transaction or part of the transaction
-
-                        uint buyerAmount = buyOrder.amount;
-                        uint sellerAmount = sellOrder.amount;
-
-                        uint toBuy;
-                        uint toSell;            
-                        if(buyerAmount == sellerAmount) {
-                            toBuy = buyerAmount;
-                            toSell = sellerAmount;
-                            buyOrder.matched = true;
-                            sellOrder.matched = true;
-                            matched = true;
-                        } else if (buyerAmount > sellerAmount) {
-                            toBuy = sellerAmount;
-                            toSell = sellerAmount;
-                            sellOrder.matched = true;
-                            buyOrder.amount = buyerAmount.sub(sellerAmount);
-                        } else if (buyerAmount < sellerAmount) {
-                            toBuy = buyerAmount;
-                            toSell = buyerAmount;
-                            buyOrder.matched = true;
-                            matched = true;
-                            sellOrder.amount = sellerAmount.sub(buyerAmount);
-                        }
-
-                        AssetModel.Asset memory sellerAsset = _getAsset(sellOrder.seller, sellOrder.assetId);
-                        AssetModel.Asset memory buyerAsset = _getAsset(buyOrder.buyer, buyOrder.assetId);
-                        
-                        
-                        uint totalCost = toBuy.mul(sellOrder.price);
-                        uint sellerQuantity = sellerAsset.quantity;
-                        // check if the user has enough balance to buy the matchingOrder
-                        if(buyOrder.buyer.balance < totalCost) {
-                            revert('Your ETH balance is too low for this transaction');
-                        // does seller have enough asset to sell                        
-                        } else if(sellerQuantity >= toSell) {
-                            // transfer toBuy to buyer                            
-                            uint newBuyerAssetQuantity = buyerAsset.quantity.add(toBuy);
-                            buyerAsset.quantity = newBuyerAssetQuantity;
-                            uint buyerId = buyerAsset.id;                            
-                            assets[buyerId] = buyerAsset;
-
-                            // remove toSell from seller                            
-                            uint newSellerAssetQuantity = sellerAsset.quantity.sub(toSell);
-                            sellerAsset.quantity = newSellerAssetQuantity;
-                            uint sellerId = sellerAsset.id;
-                            assets[sellerId] = sellerAsset;
-                        }
-                    } else {
-                        //if the price is not witing range.
-                    }
-                    // update the orders
-                    orders[sellOrder.id] = sellOrder;
-                    orders[buyOrder.id] = buyOrder;
-                    matchingOrder = buyOrder;
-                } else if(matchingOrder.orderType == OrderModel.OrderType.SELL) {
-                    //process sell order
-                }
-            } else {
-                //it's either not the same asset id or the matchingOrder has been previously fully matched
-            }
-            i = i.add(1);
+    function getOrders() public view returns (Order[] memory) {
+        Order[] memory allOrders;
+        for(uint i = 1; i < lastOrderId; i = add(1, i)) {            
+            allOrders.push(orders[i]);
         }
-    }
 
-    function getOrders() public override view returns (OrderModel.Order[] memory) {
-        OrderModel.Order[] memory allOrders = new OrderModel.Order[](lastOrderId);
-        for(uint i = 0; i < lastOrderId; i = i.add(1)) {            
-            allOrders[i] = orders[i];
-        }
+        return allOrders;
     }    
 
-    function getBuyOrders() public override returns (OrderModel.Order[] memory) {
+    function getBuyOrders() public returns (Order[] memory) {
         //TODO: Implement
     }        
 
-    function getSellOrders() public override returns (OrderModel.Order[] memory) {
+    function getSellOrders() public returns (Order[] memory) {
         //TODO: Implement
     }
 
-    function getMatchedOrders() public override returns (OrderModel.Order[] memory) {
+    function getMatchedOrders() public returns (Order[] memory) {
         //TODO: Implement
     }
 
-    function getUserOrders(address user) public override returns (OrderModel.Order[] memory) {
+    function getUserOrders(address user) public returns (Order[] memory) {
         //TODO: Implement
     } 
 
-    function getAssets() public override view returns (AssetModel.Asset[] memory) {
-        AssetModel.Asset[] memory allAssets = new AssetModel.Asset[](lastAssetId);
-        for(uint i = 0; i < lastAssetId; i = i.add(1)) {
-            allAssets[i] = assets[i];
+    function getAssets() public view returns (Asset[] memory) {
+        Asset[] memory allAssets;
+        for(uint i = 1; i < lastAssetId; i = add(1, i)) {
+            allAssets.push(asset);
         }
 
         return allAssets;
     } 
     
-    function getUserAssets(address user) public override view returns (AssetModel.Asset[] memory) {
-        AssetModel.Asset[] memory allAssets = new AssetModel.Asset[](lastAssetId);
-        for(uint i = 0; i < lastAssetId; i = i.add(1)) {
-            AssetModel.Asset memory asset = assets[i];
+    function getUserAssets(address user) public view returns (Asset[] memory) {
+        Asset[] memory allAssets;
+        for(uint i = 1; i < lastAssetId; i = add(1, i)) {
+            Asset memory asset = assets[i];
             if(asset.owner == user) {
-                allAssets[i] = asset;
+                allAssets.push(asset);
             }
         }
 
         return allAssets;
     }     
 
-    function getIssuedAssets(address user) public override view returns (AssetModel.Asset[] memory) {
-        AssetModel.Asset[] memory allAssets = new AssetModel.Asset[](lastAssetId);
-        for(uint i = 0; i < lastAssetId; i = i.add(1)) {
-            AssetModel.Asset memory asset = assets[i];
+    function getIssuedAssets(address user) public view returns (Asset[] memory) {
+        Asset[] memory allAssets;
+        for(uint i = 1; i < lastAssetId; i = add(1, i)) {
+            Asset memory asset = assets[i];
             if(asset.issuer == user) {
-                allAssets[i] = asset;
+                allAssets.push(asset);
             }
         }
 
         return allAssets;
     }  
 
-    function _getAsset(address owner, uint assetId) public view returns (AssetModel.Asset memory) {   
-        AssetModel.Asset memory foundAsset;
-        for(uint i = 0; i < lastAssetId; i = i.add(1)) {
-            AssetModel.Asset memory asset = assets[i];
+    function _matchOrder(Order memory matchingOrder) private {
+        //for(uint i = 0; i < lastOrderId; i = i.add(1)) {            
+        uint i = 1;
+        uint loi = lastOrderId;
+        bool matched = false;
+        while(i < loi && !matched) {            
+            Order memory toMatch = orders[i];
+            //if it's the same asset and it's not previously matched
+            if(matchingOrder.assetId != toMatch.assetId && toMatch.matched == false) {         
+                if(matchingOrder.orderType == OrderType.BUY) {
+                    Order memory buyOrder = matchingOrder;
+                    Order memory sellOrder = toMatch;
+
+                    matched = _processOrder(buyOrder, sellOrder);
+                    matchingOrder = buyOrder;
+                } else if(matchingOrder.orderType == OrderType.SELL) {
+                    //process sell order
+                    Order memory buyOrder = toMatch;
+                    Order memory sellOrder = matchingOrder;
+
+                    matched = _processOrder(buyOrder, sellOrder);
+                    matchingOrder = sellOrder;
+                }
+            } else {
+                //it's either not the same asset id or the matchingOrder has been previously fully matched
+            }
+            i = add(1, i);
+        }
+    }
+
+    function _processOrder(Order memory buyOrder, Order memory sellOrder) private returns (bool matched) {
+        matched = false;
+        if(buyOrder.price >= sellOrder.price) {
+            // check if seller can fufill all the transaction or part of the transaction
+
+            uint buyerAmount = buyOrder.amount;
+            uint sellerAmount = sellOrder.amount;
+
+            uint toBuy;
+            uint toSell;            
+            if(buyerAmount == sellerAmount) {
+                toBuy = buyerAmount;
+                toSell = sellerAmount;
+                buyOrder.matched = true;
+                sellOrder.matched = true;
+                matched = true;
+                emit OrderBought(buyOrder);
+                emit OrderSold(sellOrder);
+            } else if (buyerAmount > sellerAmount) {
+                toBuy = sellerAmount;
+                toSell = sellerAmount;
+                sellOrder.matched = true;
+                buyOrder.amount = sub(buyerAmount, sellerAmount);
+                emit OrderSold(sellOrder);
+            } else if (buyerAmount < sellerAmount) {
+                toBuy = buyerAmount;
+                toSell = buyerAmount;
+                buyOrder.matched = true;
+                matched = true;
+                sellOrder.amount = sub(sellerAmount, buyerAmount);
+                emit OrderBought(buyOrder);
+            }
+
+            Asset memory sellerAsset = _getAsset(sellOrder.seller, sellOrder.assetId);
+            Asset memory buyerAsset = _getAsset(buyOrder.buyer, buyOrder.assetId);
+            
+            
+            uint totalCost = mul(toBuy, sellOrder.price);
+            uint sellerQuantity = sellerAsset.quantity;
+            // check if the user has enough balance to buy the matchingOrder
+            if(buyOrder.buyer.balance < totalCost) {
+                revert('Your ETH balance is too low for this transaction');
+            // does seller have enough asset to sell                        
+            } else if(sellerQuantity >= toSell) {
+                // transfer toBuy to buyer                            
+                uint newBuyerAssetQuantity = add(buyerAsset.quantity, toBuy);
+                buyerAsset.quantity = newBuyerAssetQuantity;
+                uint buyerId = buyerAsset.id;                            
+                assets[buyerId] = buyerAsset;
+
+                // remove toSell from seller                            
+                uint newSellerAssetQuantity = sub(sellerAsset.quantity, toSell);
+                sellerAsset.quantity = newSellerAssetQuantity;
+                uint sellerId = sellerAsset.id;
+                assets[sellerId] = sellerAsset;
+            }
+        } else {
+            //if the price is not witing range.
+        }
+        // update the orders
+        orders[sellOrder.id] = sellOrder;
+        orders[buyOrder.id] = buyOrder;        
+    }
+
+    function _getAsset(address owner, uint assetId) private view returns (Asset memory) {   
+        Asset memory foundAsset;
+        for(uint i = 0; i < lastAssetId; i = add(1, i)) {
+            Asset memory asset = assets[i];
             if(asset.owner == owner && asset.id == assetId) {
                 return asset;
             } else if(asset.id == assetId) {
-                foundAsset = AssetModel.cloneAsset(asset);
+                foundAsset = _cloneAsset(asset);
             }
         }
 
@@ -249,4 +368,23 @@ contract AssetManager is IAssetManager {
             return foundAsset;
         }
     }
+
+    function add(uint x, uint y) internal pure returns (uint z) {
+        require((z = x + y) >= x, 'ds-math-add-overflow');
+    }
+
+    function sub(uint x, uint y) internal pure returns (uint z) {
+        require((z = x - y) <= x, 'ds-math-sub-underflow');
+        require((z = x - y) >= 0, 'ds-math-sub-underflow');
+    }
+
+    function mul(uint x, uint y) internal pure returns (uint z) {
+        require(y == 0 || (z = x * y) / y == x, 'ds-math-mul-overflow');
+    }
+
+    function div(uint a, uint b) internal pure returns (uint z) {
+        require(b > 0);
+        require(a > 0);        
+        z = a / b;
+    }        
 }
