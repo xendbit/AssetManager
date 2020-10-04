@@ -7,6 +7,7 @@ contract AssetManager {
     event OrderPosted(Order order);
     event OrderBought(Order order);
     event OrderSold(Order order);
+    event Error(string);
 
     enum OrderType {BUY, SELL}
     
@@ -154,7 +155,7 @@ contract AssetManager {
             name: assetRequest.name,
             description: assetRequest.description,
             totalQuantity: assetRequest.totalQuantity,
-            quantity: assetRequest.totalQuantity,,
+            quantity: assetRequest.totalQuantity,
             decimal: assetRequest.decimal,
             issuer: msg.sender,
             owner: msg.sender
@@ -167,6 +168,11 @@ contract AssetManager {
 
     function postOrder(OrderRequest memory orderRequest) public {
         _validateOrder(orderRequest);
+        Asset memory asset = assets[orderRequest.assetId];
+        if(asset.id == 0) {
+            emit Error('Requested asset does not exist');
+            revert('Requested asset does not exist');
+        }
         address seller;
         address buyer;
         uint loi = add(1, lastOrderId);
@@ -199,9 +205,9 @@ contract AssetManager {
     }
 
     function getOrders() public view returns (Order[] memory) {
-        Order[] memory allOrders;
-        for(uint i = 1; i < lastOrderId; i = add(1, i)) {            
-            allOrders.push(orders[i]);
+        Order[] memory allOrders = new Order[](lastOrderId);
+        for(uint i = 0; i < lastOrderId; i = add(1, i)) {            
+            allOrders[i] = orders[i];
         }
 
         return allOrders;
@@ -223,42 +229,40 @@ contract AssetManager {
         //TODO: Implement
     } 
 
-    function getAssets() public view returns (Asset[] memory) {
-        Asset[] memory allAssets;
-        for(uint i = 1; i < lastAssetId; i = add(1, i)) {
-            allAssets.push(asset);
+    function getAssets() public view returns (Asset[] memory) {        
+        Asset[] memory allAssets = new Asset[](lastAssetId);
+        for(uint i = 0; i < lastAssetId; i = add(1, i)) {
+            allAssets[i] = assets[i];
         }
-
+        
         return allAssets;
     } 
     
     function getUserAssets(address user) public view returns (Asset[] memory) {
-        Asset[] memory allAssets;
-        for(uint i = 1; i < lastAssetId; i = add(1, i)) {
-            Asset memory asset = assets[i];
-            if(asset.owner == user) {
-                allAssets.push(asset);
+        Asset[] memory allAssets = new Asset[](lastAssetId);
+        for(uint i = 0; i < lastAssetId; i = add(1, i)) {
+            if(assets[i].owner == user) {
+                allAssets[i] = assets[i];
             }
         }
-
+        
         return allAssets;
     }     
 
     function getIssuedAssets(address user) public view returns (Asset[] memory) {
-        Asset[] memory allAssets;
-        for(uint i = 1; i < lastAssetId; i = add(1, i)) {
-            Asset memory asset = assets[i];
-            if(asset.issuer == user) {
-                allAssets.push(asset);
+        Asset[] memory allAssets = new Asset[](lastAssetId);
+        for(uint i = 0; i < lastAssetId; i = add(1, i)) {
+            if(assets[i].issuer == user) {
+                allAssets[i] = assets[i];
             }
         }
-
+        
         return allAssets;
     }  
 
     function _matchOrder(Order memory matchingOrder) private {
         //for(uint i = 0; i < lastOrderId; i = i.add(1)) {            
-        uint i = 1;
+        uint i = 0;
         uint loi = lastOrderId;
         bool matched = false;
         while(i < loi && !matched) {            
