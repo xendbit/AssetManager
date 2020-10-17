@@ -39,8 +39,10 @@ async function deploy(abiPath, binPath) {
 }
 
 async function run() {
-    res = await deploy('/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_classes_AssetManager_sol_AssetManager.abi', '/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_classes_AssetManager_sol_AssetManager.bin');
-    console.log(res);
+    res = await deploy('/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_AssetManager_sol_AssetManager.abi', '/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_AssetManager_sol_AssetManager.bin');
+    console.log("AssetManager: --> ", res);
+    //res = await deploy('/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/__contracts_NGNC_sol_NGNC.abi', '/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/__contracts_NGNC_sol_NGNC.bin');
+    //console.log("NGNC: --> ", res);
 }
 
 run();

@@ -48,8 +48,8 @@ contract StandardToken is Token {
         //Replace the if with this one instead.
         //if (balances[msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
         if (balances[msg.sender] >= _value && _value > 0) {
-            balances[msg.sender] -= _value;
-            balances[_to] += _value;
+            balances[msg.sender] = sub(balances[msg.sender],  _value);
+            balances[_to] = add(balances[_to], _value);
             emit Transfer(msg.sender, _to, _value);
             return true;
         } else {
@@ -61,9 +61,9 @@ contract StandardToken is Token {
         //same as above. Replace this line with the following if you want to protect against wrapping uints.
         //if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
         if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && _value > 0) {
-            balances[_to] += _value;
-            balances[_from] -= _value;
-            allowed[_from][msg.sender] -= _value;
+            balances[_to] = add(balances[_to], _value);
+            balances[_from] = sub(balances[_from],  _value);            
+            allowed[_from][msg.sender] = sub(allowed[_from][msg.sender], _value);
             emit Transfer(_from, _to, _value);
             return true;
         } else {
@@ -92,6 +92,25 @@ contract StandardToken is Token {
     mapping (address => uint256) balances;
     mapping (address => mapping (address => uint256)) allowed;
     uint256 public _totalSupply;
+
+    function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require((z = x + y) >= x, 'ds-math-add-overflow');
+    }
+
+    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require((z = x - y) <= x, 'ds-math-sub-underflow');
+        require((z = x - y) >= 0, 'ds-math-sub-underflow');
+    }
+
+    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require(y == 0 || (z = x * y) / y == x, 'ds-math-mul-overflow');
+    }
+
+    function div(uint256 a, uint256 b) internal pure returns (uint256 z) {
+        require(b > 0);
+        require(a > 0);        
+        z = a / b;
+    }    
 }
 
 
@@ -115,7 +134,7 @@ contract NGNC is StandardToken {
     //make sure this function name matches the contract name above. So if you're token is called TutorialToken, make sure the //contract name above is also TutorialToken instead of ERC20Token
 
     constructor () {
-        balances[msg.sender] = 10000000000;               // Give the creator all initial tokens (100000 for example)
-        _totalSupply = 10000000000;                        // Update total supply (100000 for example)
+        balances[msg.sender] = 100000000000;               // Give the creator all initial tokens (100000 for example)
+        _totalSupply = 100000000000;                        // Update total supply (100000 for example)
     }
 }
