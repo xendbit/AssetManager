@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const web3 = new Web3(props.web3URL);
-const contractAddress = '0x0D0eff6f18e70253f2BD653DF9f9FE36994790d6';
+const contractAddress = '0x9832972039DB927a94E7EaB2DCa3c648BfA524e6';
 const abiPath = '/Users/aardvocate/src/SmartContractCreator/build/contracts/AssetManager.json';
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);

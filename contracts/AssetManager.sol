@@ -2,87 +2,20 @@
 pragma solidity ^0.7.2;
 pragma experimental ABIEncoderV2;
 
+import { OrderModel } from './library/OrderModel.sol';
+
 contract AssetManager {        
     event AssetCreated(Asset asset);
     event AssetAlreadyExists(AssetRequest asset);
-    event OrderPosted(Order order);
-    event OrderBought(Order order);    
-    event OrderSold(Order order);
+    event OrderPosted(OrderModel.Order order);
+    event OrderBought(OrderModel.Order order);    
+    event OrderSold(OrderModel.Order order);
     event DEBUG(string str);
     event DEBUG(uint256 str);
     event DEBUG(address str);
     event DEBUG(bool str);
 
     uint256 ONE_WEI = 1000000000000000000;
-    enum OrderType {BUY, SELL}
-    enum OrderStrategy {PARTIAL, ALL_OR_NOTHING}
-    
-    /**
-    This is how the final Ethereum cost will be calculated
-    Price must be in wei
-    Final Ether cost is now price * amount. Amount must take into consideration the number of decimal places.
-    So if you intend to send 200, you must supply 200 * (10**decimals) to the Smart Contract call.
-     */
-    struct Order {
-        uint256 id;
-        OrderType orderType;
-        OrderStrategy orderStrategy;
-        address seller;
-        address buyer;
-        string assetName;
-        uint256 amount;
-        uint256 originalAmount;
-        uint256 price;
-        bool matched;
-    }
-
-    // Price must be in wei
-    struct OrderRequest {
-        OrderType orderType;
-        OrderStrategy orderStrategy;
-        uint256 amount;
-        uint256 price;
-        string assetName;
-        address assetIssuer;
-    }
-
-    function _cloneOrder(Order memory o) private pure returns (Order memory) {
-        Order memory newOrder = Order({
-            id: o.id,
-            orderType: o.orderType,
-            seller: o.seller,
-            buyer: o.buyer,
-            assetName: o.assetName,
-            amount: o.amount,
-            price: o.price,
-            matched: o.matched,
-            orderStrategy: o.orderStrategy,
-            originalAmount: o.originalAmount
-        });
-
-        return newOrder;
-    }
-
-    function _copyOrder(Order memory from, Order memory to) private pure {
-        to.id = from.id;
-        to.orderType = from.orderType;
-        to.orderStrategy = from.orderStrategy;
-        to.seller = from.seller;
-        to.buyer = from.buyer;
-        to.assetName = from.assetName;
-        to.amount = from.amount;
-        to.price = from.price;
-        to.matched = from.matched;        
-        to.originalAmount = from.originalAmount;
-    }
-
-    function _validateOrder(OrderRequest memory order) private pure {
-        bytes memory b = bytes(order.assetName);
-        require(b.length > 0);
-        require(order.amount > 0);
-        require(order.price > 0);
-    }
-
     /**
         totalQuantity is AssetRequest.totalQuantity * (10 ** decimal)
      */
@@ -142,8 +75,8 @@ contract AssetManager {
     mapping (uint256 => Asset) public assets;
     uint256 lastAssetId;
 
-    // Store All Orders. Key is Order ID
-    mapping (uint256 => Order) public orders;
+    // Store All Orders. Key is OrderModel.Order ID
+    mapping (uint256 => OrderModel.Order) public orders;
     uint256 lastOrderId;
 
     // store NGNC, key is address (ngnc is in wei)
@@ -230,8 +163,8 @@ contract AssetManager {
         }
     } 
 
-    function postOrder(OrderRequest memory orderRequest) public payable {
-        _validateOrder(orderRequest);
+    function postOrder(OrderModel.OrderRequest memory orderRequest) public payable {
+        OrderModel.validateOrder(orderRequest);
 
         Asset memory asset = _getAssetByNameAndIssuer(orderRequest.assetName, orderRequest.assetIssuer);
 
@@ -242,7 +175,7 @@ contract AssetManager {
             address seller;
             address buyer;
             uint256 loi = lastOrderId;
-            if(orderRequest.orderType == OrderType.BUY) {
+            if(orderRequest.orderType == OrderModel.OrderType.BUY) {
                 //does the buyer send enough ether to cover the transaction
                 uint256 value = msg.value;
                 uint256 totalCost = mul(orderRequest.amount, orderRequest.price);
@@ -281,7 +214,7 @@ contract AssetManager {
                     emit AssetCreated(buyerAsset);
                 }
 
-            } else if(orderRequest.orderType == OrderType.SELL) {
+            } else if(orderRequest.orderType == OrderModel.OrderType.SELL) {
                 buyer =  address(0);            
                 seller = msg.sender;            
                 //check that you have the asset you want to sell
@@ -292,7 +225,7 @@ contract AssetManager {
                 }            
             }
 
-            Order memory dbOrder = Order({
+            OrderModel.Order memory dbOrder = OrderModel.Order({
                 id: loi,
                 orderType: orderRequest.orderType,
                 orderStrategy: orderRequest.orderStrategy,
@@ -309,15 +242,15 @@ contract AssetManager {
             lastOrderId = add(1, lastOrderId);
 
             // try and match the matchingOrder with previously posted orders        
-            Order memory matchingOrder;
-            _copyOrder(dbOrder, matchingOrder);
+            OrderModel.Order memory matchingOrder;
+            OrderModel.copyOrder(dbOrder, matchingOrder);
             emit OrderPosted(matchingOrder);
             _matchOrder(matchingOrder, loi);
         }
     }
 
-    function getOrders() public view returns (Order[] memory) {
-        Order[] memory allOrders = new Order[](lastOrderId);
+    function getOrders() public view returns (OrderModel.Order[] memory) {
+        OrderModel.Order[] memory allOrders = new OrderModel.Order[](lastOrderId);
         for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {            
             allOrders[i] = orders[i];
         }
@@ -325,10 +258,10 @@ contract AssetManager {
         return allOrders;
     }    
 
-    function getBuyOrders() public view returns (Order[] memory) {
-        Order[] memory allOrders = new Order[](lastOrderId);
+    function getBuyOrders() public view returns (OrderModel.Order[] memory) {
+        OrderModel.Order[] memory allOrders = new OrderModel.Order[](lastOrderId);
         for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {    
-            if(orders[i].orderType == OrderType.BUY) {
+            if(orders[i].orderType == OrderModel.OrderType.BUY) {
                 allOrders[i] = orders[i];
             }
         }
@@ -336,10 +269,10 @@ contract AssetManager {
         return allOrders;
     }        
 
-    function getSellOrders() public view returns (Order[] memory) {
-        Order[] memory allOrders = new Order[](lastOrderId);
+    function getSellOrders() public view returns (OrderModel.Order[] memory) {
+        OrderModel.Order[] memory allOrders = new OrderModel.Order[](lastOrderId);
         for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {    
-            if(orders[i].orderType == OrderType.SELL) {
+            if(orders[i].orderType == OrderModel.OrderType.SELL) {
                 allOrders[i] = orders[i];
             }
         }
@@ -347,8 +280,8 @@ contract AssetManager {
         return allOrders;
     }
 
-    function getMatchedOrders() public view returns (Order[] memory) {
-        Order[] memory allOrders = new Order[](lastOrderId);
+    function getMatchedOrders() public view returns (OrderModel.Order[] memory) {
+        OrderModel.Order[] memory allOrders = new OrderModel.Order[](lastOrderId);
         for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {    
             if(orders[i].matched) {
                 allOrders[i] = orders[i];
@@ -358,8 +291,8 @@ contract AssetManager {
         return allOrders;
     }
 
-    function getUserOrders(address user) public view returns (Order[] memory) {
-        Order[] memory allOrders = new Order[](lastOrderId);
+    function getUserOrders(address user) public view returns (OrderModel.Order[] memory) {
+        OrderModel.Order[] memory allOrders = new OrderModel.Order[](lastOrderId);
         for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {    
             if(orders[i].buyer == user || orders[i].seller == user) {
                 allOrders[i] = orders[i];
@@ -400,14 +333,14 @@ contract AssetManager {
         return allAssets;
     }  
 
-    function _matchOrder(Order memory matchingOrder, uint256 loi) private {        
+    function _matchOrder(OrderModel.Order memory matchingOrder, uint256 loi) private {        
         uint256 i = 0;        
         bool matched = false;
         uint256 toBuy = 0;
         uint256 toSell = 0;
         //Asset memory asset = assets[matchingOrder.assetId];
         while(i < loi && matched == false) {            
-            Order memory toMatch = orders[i];
+            OrderModel.Order memory toMatch = orders[i];
             bool assetNameEquals = keccak256(bytes(matchingOrder.assetName)) == keccak256(bytes(toMatch.assetName));
             bool sameType = toMatch.orderType == matchingOrder.orderType;
             bool buyerIsSeller = false;
@@ -421,18 +354,18 @@ contract AssetManager {
 
             if(shouldProcess) {               
 
-                if(matchingOrder.orderType == OrderType.BUY) {
-                    Order memory buyOrder;
+                if(matchingOrder.orderType == OrderModel.OrderType.BUY) {
+                    OrderModel.Order memory buyOrder;
                     //copy matchingOrder into buyOrder
-                    _copyOrder(matchingOrder, buyOrder);
+                    OrderModel.copyOrder(matchingOrder, buyOrder);
 
                     // match buy to sell
                     // 1. Copy toMatch into sellOrder
                     // 2. Process the order
                     // 3. Copy updated buyOrder into matchingOrder
-                    Order memory sellOrder;
-                    _copyOrder(toMatch, sellOrder);
-                    if(sellOrder.orderType == OrderType.SELL) {
+                    OrderModel.Order memory sellOrder;
+                    OrderModel.copyOrder(toMatch, sellOrder);
+                    if(sellOrder.orderType == OrderModel.OrderType.SELL) {
                         (matched, toBuy, toSell) = _processOrder(buyOrder, sellOrder);
                         if(matched) {
                             // transfer money from escrow of buyer to seller
@@ -442,20 +375,20 @@ contract AssetManager {
                             ngnc[sellOrder.seller] = add(sellerBalance, totalCost);
                             escrow[buyOrder.buyer] = sub(buyerBalance, totalCost);                    
                         }                        
-                        _copyOrder(orders[buyOrder.id], matchingOrder );
+                        OrderModel.copyOrder(orders[buyOrder.id], matchingOrder );
                     }                    
-                } else if(matchingOrder.orderType == OrderType.SELL) {
-                    Order memory sellOrder;
+                } else if(matchingOrder.orderType == OrderModel.OrderType.SELL) {
+                    OrderModel.Order memory sellOrder;
                     //copy matchingOrder into sellOrder
-                    _copyOrder(matchingOrder, sellOrder);
+                    OrderModel.copyOrder(matchingOrder, sellOrder);
                     
                     // match sell to buy
                     // 1. Copy toMatch into buyOrder
                     // 2. Process the order
                     // 3. Copy updated sellOrder into matchingOrder
-                    Order memory buyOrder;
-                    _copyOrder(toMatch, buyOrder);
-                    if(buyOrder.orderType == OrderType.BUY) {
+                    OrderModel.Order memory buyOrder;
+                    OrderModel.copyOrder(toMatch, buyOrder);
+                    if(buyOrder.orderType == OrderModel.OrderType.BUY) {
                         (matched, toBuy, toSell) = _processOrder(buyOrder, sellOrder);
                         if(matched) {
                             // transfer money from escrow of buyer to seller
@@ -465,7 +398,7 @@ contract AssetManager {
                             ngnc[sellOrder.seller] = add(sellerBalance, totalCost);
                             escrow[buyOrder.buyer] = sub(buyerBalance, totalCost);                    
                         }                        
-                        _copyOrder(orders[sellOrder.id], matchingOrder );
+                        OrderModel.copyOrder(orders[sellOrder.id], matchingOrder );
                     }
                 }                
             } else {
@@ -475,7 +408,7 @@ contract AssetManager {
         }
     }
 
-    function _processOrder(Order memory buyOrder, Order memory sellOrder) private returns (bool matched, uint256 toBuy, uint256 toSell) {
+    function _processOrder(OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private returns (bool matched, uint256 toBuy, uint256 toSell) {
         matched = false;
         if(buyOrder.price >= sellOrder.price) {
             // check if seller can fufill all the transaction or part of the transaction
@@ -498,14 +431,14 @@ contract AssetManager {
                 buyOrder.amount = 0;
                 emit OrderBought(buyOrder);
                 emit OrderSold(sellOrder);
-            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy == OrderStrategy.PARTIAL) {
+            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy == OrderModel.OrderStrategy.PARTIAL) {
                 toBuy = sellerAmount;
                 toSell = sellerAmount;
                 sellOrder.matched = true;
                 buyOrder.amount = sub(buyerAmount, sellerAmount);
                 sellOrder.amount = 0;
                 emit OrderSold(sellOrder);
-            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy == OrderStrategy.PARTIAL) {
+            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy == OrderModel.OrderStrategy.PARTIAL) {
                 toBuy = buyerAmount;
                 toSell = buyerAmount;
                 buyOrder.matched = true;
