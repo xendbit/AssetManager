@@ -163,22 +163,23 @@ contract AssetManager {
 
     function transferAsset(address toAddress, string memory assetName, uint256 amount) public {
         Asset memory senderAsset = _getAssetByNameAndOwner(assetName, msg.sender);
-        if(senderAsset.quantity >= amount) {
-            Asset memory asset = _getAssetByNameAndOwner(assetName, msg.sender);
-            if(asset.owner == msg.sender && asset.quantity > amount) {
-                Asset memory assetToTransfer = _getAssetByNameAndOwner(assetName, toAddress);
+        Asset memory assetToTransfer = _getAssetByNameAndOwner(assetName, toAddress);
+
+        if(senderAsset.quantity >= amount) {            
+            if(senderAsset.owner == msg.sender && senderAsset.quantity > amount) {                
                 if(assetToTransfer.owner == address(0)) {
                     // create an asset for the user
                     senderAsset.quantity = sub(senderAsset.quantity, amount);
+                    assets[senderAsset.id] = senderAsset;
                     assetToTransfer = Asset({
                         id: lastAssetId,
                         name: assetName,
-                        description: asset.description,
-                        totalQuantity: asset.totalQuantity,
+                        description: senderAsset.description,
+                        totalQuantity: senderAsset.totalQuantity,
                         quantity: amount,
-                        decimal: asset.decimal,
+                        decimal: senderAsset.decimal,
                         owner: toAddress,
-                        issuer: asset.issuer
+                        issuer: senderAsset.issuer
                     });
                     assets[lastAssetId] = assetToTransfer;     
                     lastAssetId = add(lastAssetId, 1);                    
@@ -186,6 +187,7 @@ contract AssetManager {
                     senderAsset.quantity = sub(senderAsset.quantity, amount);
                     assetToTransfer.quantity = add(assetToTransfer.quantity, amount);                                    
                     assets[assetToTransfer.id] = assetToTransfer;        
+                    assets[senderAsset.id] = senderAsset;
                 }            
             } else {
                 emit DEBUG("Asset not found or you don't have enough to transfer");
@@ -257,21 +259,22 @@ contract AssetManager {
                 buyer = msg.sender;
                 seller = address(0);    
                 // if this buyer doesn't have this asset, create one for them
-                Asset memory buyerAsset = _getAssetByNameAndOwner(orderRequest.assetName, msg.sender);
+                Asset memory buyerAsset = _getAssetByNameAndOwner(orderRequest.assetName, msg.sender);                
                 if(buyerAsset.owner == address(0)) {                
-                    uint256 totalQuantity = asset.totalQuantity;
-                    AssetRequest memory ar = AssetRequest({
+                    buyerAsset = Asset({
+                        id: lastAssetId,
                         name: orderRequest.assetName,
                         description: asset.description,
-                        totalQuantity: totalQuantity,
-                        decimal: asset.decimal
+                        totalQuantity: asset.totalQuantity,
+                        quantity: 0,
+                        decimal: asset.decimal,
+                        owner: msg.sender,
+                        issuer: asset.issuer
                     });
-                    createAsset(ar);
-                    buyerAsset = assets[lastAssetId - 1];
-                    buyerAsset.owner = msg.sender;
-                    buyerAsset.issuer = asset.issuer;
-                    buyerAsset.quantity = 0;        
-                    assets[lastAssetId - 1] = buyerAsset;        
+                    assets[lastAssetId] = buyerAsset;     
+                    lastAssetId = add(lastAssetId, 1);
+
+                    emit AssetCreated(buyerAsset);
                 }
 
             } else if(orderRequest.orderType == OrderType.SELL) {
@@ -372,9 +375,19 @@ contract AssetManager {
         //Asset memory asset = assets[matchingOrder.assetId];
         while(i < loi && matched == false) {            
             Order memory toMatch = orders[i];
-            //if it's the same asset and it's not previously matched and not the same orderType (i.e BUY != SELL)
             bool assetNameEquals = keccak256(bytes(matchingOrder.assetName)) == keccak256(bytes(toMatch.assetName));
-            if(assetNameEquals && toMatch.matched == false && toMatch.orderType != matchingOrder.orderType) {         
+            bool sameType = toMatch.orderType == matchingOrder.orderType;
+            bool buyerIsSeller = false;
+            if(toMatch.seller != address(0) && matchingOrder.buyer != address(0)) {
+                buyerIsSeller = toMatch.seller == matchingOrder.buyer;
+            } else if (toMatch.buyer != address(0) && matchingOrder.seller != address(0)) {
+                buyerIsSeller = toMatch.buyer == matchingOrder.seller;
+            }
+
+            bool shouldProcess = assetNameEquals && !toMatch.matched && !sameType && !buyerIsSeller;
+
+            if(shouldProcess) {               
+
                 if(matchingOrder.orderType == OrderType.BUY) {
                     Order memory buyOrder;
                     //copy matchingOrder into buyOrder
@@ -433,15 +446,14 @@ contract AssetManager {
         matched = false;
         if(buyOrder.price >= sellOrder.price) {
             // check if seller can fufill all the transaction or part of the transaction
-
             uint256 buyerAmount = buyOrder.amount;
             uint256 sellerAmount = sellOrder.amount;
 
             // uint256 toBuy;
             // uint256 toSell;  
-            Asset memory sellerAsset = _getAssetByNameAndOwner(buyOrder.assetName, buyOrder.buyer);
-            Asset memory buyerAsset = _getAssetByNameAndOwner(sellOrder.assetName, sellOrder.seller);
-            
+            Asset memory buyerAsset = _getAssetByNameAndOwner(buyOrder.assetName, buyOrder.buyer);
+            Asset memory sellerAsset = _getAssetByNameAndOwner(sellOrder.assetName, sellOrder.seller);
+                        
             if(buyerAmount == sellerAmount) {
                 // Either the strategy is all or nothing or it is partial, run this code
                 toBuy = buyerAmount;
@@ -449,6 +461,8 @@ contract AssetManager {
                 buyOrder.matched = true;
                 sellOrder.matched = true;
                 matched = true;
+                sellOrder.amount = 0;
+                buyOrder.amount = 0;
                 emit OrderBought(buyOrder);
                 emit OrderSold(sellOrder);
             } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy == OrderStrategy.PARTIAL) {
@@ -456,12 +470,14 @@ contract AssetManager {
                 toSell = sellerAmount;
                 sellOrder.matched = true;
                 buyOrder.amount = sub(buyerAmount, sellerAmount);
+                sellOrder.amount = 0;
                 emit OrderSold(sellOrder);
             } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy == OrderStrategy.PARTIAL) {
                 toBuy = buyerAmount;
                 toSell = buyerAmount;
                 buyOrder.matched = true;
                 sellOrder.amount = sub(sellerAmount, buyerAmount);
+                buyOrder.amount = 0;
                 emit OrderBought(buyOrder);                
             }
             
@@ -536,15 +552,6 @@ contract AssetManager {
 
         return asset;
     }
-
-    // function _getAsset(address owner, uint256 assetId) private view returns (Asset memory) {   
-    //     for(uint256 i = 0; i < lastAssetId; i = add(1, i)) {
-    //         Asset memory asset = assets[i];
-    //         if(asset.owner == owner && asset.id == assetId) {
-    //             return asset;
-    //         } 
-    //     }
-    // }
 
     function add(uint256 x, uint256 y) private pure returns (uint256 z) {
         require((z = x + y) >= x, 'ds-math-add-overflow');

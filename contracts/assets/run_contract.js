@@ -4,14 +4,14 @@ const path = require('path');
 const fs = require('fs');
 
 const web3 = new Web3(props.web3URL);
-const contractAddress = '0xa1782FDBE6906fdb198FbA0E21C6cC92D17C85f7';
+const contractAddress = '0x22e4e1ec483b5504A8b361d32aEb56863194fD00';
 const abiPath = '/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_AssetManager_sol_AssetManager.abi';
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi, contractAddress);
 
 function importAddress() {
     // main mac - default
-    web3.eth.personal.importRawKey(props.privKey, 'Wq017kmg@tm');
+    //web3.eth.personal.importRawKey(props.privKey, 'Wq017kmg@tm');
     web3.eth.personal.importRawKey(props.user2.privKey, 'Wq017kmg@tm');
     web3.eth.personal.importRawKey(props.user1.privKey, 'Wq017kmg@tm');
 }
@@ -129,19 +129,20 @@ function getUserAssets(address, callback) {
  * @param {*} price 
  * @param {*} assetId 
  */
-function postOrder(orderType, amount, price, assetId) {
+function postOrder(orderType, orderStrategy, amount, price, assetName, assetIssuer) {
     let value = 0;
     if (orderType === 'BUY') {
         // we must send ether to the smart contract worth how much we are willing to pay
-        value = web3.utils.toWei((amount * price), 'ether');
+        value = amount * price;
     }
 
     const orderRequest = {
         orderType: orderType === 'BUY' ? 0 : 1,
+        orderStrategy: orderStrategy === 'PARTIAL' ? 0 : 1,
         amount: amount,
         price: price,
-        strategyType: 0,
-        assetId: assetId
+        assetName: assetName,
+        assetIssuer: assetIssuer,
     }
 
     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
@@ -151,16 +152,18 @@ function postOrder(orderType, amount, price, assetId) {
     });
 }
 
-function postOrderWithAddress(address, password, orderType, amount, price, assetId) {
+function postOrderWithAddress(address, password, orderType, orderStrategy, amount, price, assetName, assetIssuer) {
     const orderRequest = {
-        orderType: orderType == 'BUY' ? 0 : 1,
+        orderType: orderType === 'BUY' ? 0 : 1,
+        orderStrategy: orderStrategy === 'PARTIAL' ? 0 : 1,
         amount: amount,
         price: price,
-        assetId: assetId
+        assetName: assetName,
+        assetIssuer: assetIssuer,
     }
 
     web3.eth.personal.unlockAccount(address, password).then(() => {
-        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address }).on('transactionHash', (hash) => {
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: address }).on('transactionHash', (hash) => {
             console.log(hash);
         });
     });
@@ -176,9 +179,10 @@ function getOrders(callback) {
                     order = {
                         id: res.id,
                         orderType: res.orderType == 0 ? 'BUY' : 'SELL',
+                        orderStrategy: res.orderStrategy == 0 ? 'PARTIAL' : 'ALL_OR_NOTHING',
                         seller: res.seller,
                         buyer: res.buyer,
-                        assetId: res.assetId,
+                        assetName: res.assetName,
                         amount: res.amount,
                         price: res.price,
                         matched: res.matched
@@ -216,6 +220,14 @@ function createAssets() {
     });
 }
 
+function createAssetsMini() {
+    createNewAsset('BUD', 'Budweiser', async (hash) => {
+        console.log(hash);
+        await sleep(5000);
+        getAssets((allAssets) => { console.log(allAssets); });
+    });
+}
+
 async function sleep(msec) {
     return new Promise(resolve => setTimeout(resolve, msec));
 }
@@ -228,19 +240,30 @@ function transferAsset(address, amount, assetName) {
     });
 }
 
+async function start() {
+    createAssetsMini();
+    await sleep(30000);
+    transferAsset(props.user2.address, 3150, "BUD");
+    await sleep(1000);
+    console.log("posting order 1");    
+    postOrder('BUY', 'PARTIAL', 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
+    await sleep(15000);
+    getOrders((allOrders) => { console.log(allOrders) });
+}
+
+//start();
 //processEvents();
 //importAddress();
 //createAssets();
 // transferAsset(props.user1.address, 200000000, 3);
-//transferAsset(props.user2.address, 150, "GUIL");
+//transferAsset(props.user2.address, 3150, "BUD");
 getAssets((allAssets) => { console.log(allAssets); });
 //getIssuedAssets('0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', (allAssets) => {console.log(allAssets)});
 //getUserAssets(props.user2.address, (allAssets) => {console.log(allAssets)});
 // getUserAssets('0x2D00F0bB90859015E000477053AB1E44a53cB40B', (allAssets) => {console.log(allAssets)});
 // price should be in wei
-// postOrder('SELL', 1500, 1, 3, (hash) => console.log(hash));
-// postOrder('SELL', 2000, 10, 2, (hash) => console.log(hash));
-// postOrderWithAddress(props.user1.address, props.user1.password, 'BUY', 2000, 15, 3, (hash) => console.log(hash));
- //postOrderWithAddress(props.user1.address, props.user1.password, 'BUY', 20000, 15, 4, (hash) => console.log(hash));
+//postOrder('SELL', 'PARTIAL', 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
+//postOrder('BUY', 'PARTIAL', 783, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
+//postOrderWithAddress(props.user2.address, props.user2.password, 'SELL', 'PARTIAL', 2000, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
 //getOrders((allOrders) => { console.log(allOrders) });
  

@@ -4,14 +4,14 @@ const properties = {
     address: '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc',
     gas: '4004356',
     user1: {
-        privKey: "498ea38b2b6408be76d6c45b2939c2f195a16ac4bca7e62772fc549c7a798176",
+        privKey: "c5fd8168f094e64e585be23c240b01ed6da7dbe783cf47421f8472214bf701b0",
         password: "Wq017kmg@tm",
-        address: "0xE447B45EA6FD4c8B76b25354a503C793826e5294",
+        address: "0xC04915f6b3ff85b50A863eB1FcBF368171539413",
     },
     user2: {
-        privKey: "696db30effa701271cc20a7582a0dfd708b13724c1177682a4571b11067d4622",
+        privKey: "3de25762510fd866ddc7042357d6e26958c3ee7ae0efb175e1281982be2e3ec3",
         password: "Wq017kmg@tm",
-        address: "0x1e5884839a731D409867166fa39eF8B66D629e83",
+        address: "0xf0eB683bb243eCE4Fe94494E4014628AfCb6Efe5",
     },  
     
     
