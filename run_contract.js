@@ -323,7 +323,7 @@ async function start() {
 }
 
 //start();
-processEvents();
+//processEvents();
 //importAddress();
 //createAssets();
 // transferAsset(props.user1.address, 200000000, 3);
