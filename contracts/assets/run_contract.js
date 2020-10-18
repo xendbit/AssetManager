@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const web3 = new Web3(props.web3URL);
-const contractAddress = '0x22e4e1ec483b5504A8b361d32aEb56863194fD00';
+const contractAddress = '0x9d8385d41298DfBD37652EB78D96768D5e7070bA';
 const abiPath = '/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_AssetManager_sol_AssetManager.abi';
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi, contractAddress);
@@ -153,6 +153,7 @@ function postOrder(orderType, orderStrategy, amount, price, assetName, assetIssu
 }
 
 function postOrderWithAddress(address, password, orderType, orderStrategy, amount, price, assetName, assetIssuer) {
+    
     const orderRequest = {
         orderType: orderType === 'BUY' ? 0 : 1,
         orderStrategy: orderStrategy === 'PARTIAL' ? 0 : 1,
@@ -176,23 +177,90 @@ function getOrders(callback) {
         AssetManagerContract.methods.getOrders().call({ from: props.address, gas: props.gas, }).then((result) => {
             for (res of result) {
                 if (res.id >= 0) {
-                    order = {
-                        id: res.id,
-                        orderType: res.orderType == 0 ? 'BUY' : 'SELL',
-                        orderStrategy: res.orderStrategy == 0 ? 'PARTIAL' : 'ALL_OR_NOTHING',
-                        seller: res.seller,
-                        buyer: res.buyer,
-                        assetName: res.assetName,
-                        amount: res.amount,
-                        price: res.price,
-                        matched: res.matched
-                    }
+                    order = populateOrder(res);
                     allOrders.push(order);
                 }
             }
             callback(allOrders);
         });
     });
+}
+
+function getBuyOrders(callback) {
+    let allOrders = [];
+    web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.methods.getBuyOrders().call({ from: props.address, gas: props.gas, }).then((result) => {
+            for (res of result) {
+                if (res.id >= 0 && (res.seller !== "0x0000000000000000000000000000000000000000" || res.buyer !== "0x0000000000000000000000000000000000000000")) {
+                    order = populateOrder(res);
+                    allOrders.push(order);
+                }
+            }
+            callback(allOrders);
+        });
+    });
+}
+
+function getSellOrders(callback) {
+    let allOrders = [];
+    web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.methods.getSellOrders().call({ from: props.address, gas: props.gas, }).then((result) => {
+            for (res of result) {
+                if (res.id >= 0 && (res.seller !== "0x0000000000000000000000000000000000000000" || res.buyer !== "0x0000000000000000000000000000000000000000")) {
+                    order = populateOrder(res);
+                    allOrders.push(order);
+                }
+            }
+            callback(allOrders);
+        });
+    });
+}
+
+function getMatchedOrders(callback) {
+    let allOrders = [];
+    web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.methods.getMatchedOrders().call({ from: props.address, gas: props.gas, }).then((result) => {
+            for (res of result) {
+                if (res.id >= 0 && (res.seller !== "0x0000000000000000000000000000000000000000" || res.buyer !== "0x0000000000000000000000000000000000000000")) {
+                    order = populateOrder(res);
+                    allOrders.push(order);
+                }
+            }
+            callback(allOrders);
+        });
+    });
+}
+
+function getUserOrders(user, callback) {
+    let allOrders = [];
+    web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.methods.getUserOrders(user).call({ from: props.address, gas: props.gas, }).then((result) => {
+            for (res of result) {
+                if (res.id >= 0 && (res.seller !== "0x0000000000000000000000000000000000000000" || res.buyer !== "0x0000000000000000000000000000000000000000")) {
+                    order = populateOrder(res);
+                    allOrders.push(order);
+                }
+            }
+            callback(allOrders);
+        });
+    });
+}
+
+function populateOrder(res) {
+    order = {
+        id: res.id,
+        orderType: res.orderType == 0 ? 'BUY' : 'SELL',
+        orderStrategy: res.orderStrategy == 0 ? 'PARTIAL' : 'ALL_OR_NOTHING',
+        seller: res.seller,
+        buyer: res.buyer,
+        assetName: res.assetName,
+        amount: res.amount,
+        originalAmount: res.originalAmount,
+        price: res.price,
+        matched: res.matched
+    }
+
+    return order;
 }
 
 
@@ -257,13 +325,17 @@ async function start() {
 //createAssets();
 // transferAsset(props.user1.address, 200000000, 3);
 //transferAsset(props.user2.address, 3150, "BUD");
-getAssets((allAssets) => { console.log(allAssets); });
+//getAssets((allAssets) => { console.log(allAssets); });
 //getIssuedAssets('0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', (allAssets) => {console.log(allAssets)});
 //getUserAssets(props.user2.address, (allAssets) => {console.log(allAssets)});
 // getUserAssets('0x2D00F0bB90859015E000477053AB1E44a53cB40B', (allAssets) => {console.log(allAssets)});
 // price should be in wei
 //postOrder('SELL', 'PARTIAL', 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
 //postOrder('BUY', 'PARTIAL', 783, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
-//postOrderWithAddress(props.user2.address, props.user2.password, 'SELL', 'PARTIAL', 2000, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
+//postOrderWithAddress(props.user2.address, props.user2.password, 'SELL', 'PARTIAL', 167, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
 //getOrders((allOrders) => { console.log(allOrders) });
- 
+
+//getBuyOrders((allOrders) => {console.log(allOrders)});
+//getSellOrders((allOrders) => {console.log(allOrders)});
+ //getMatchedOrders((allOrders) => {console.log(allOrders)});
+getUserOrders(props.user2.address, (allOrders) => {console.log(allOrders)});

@@ -31,6 +31,7 @@ contract AssetManager {
         address buyer;
         string assetName;
         uint256 amount;
+        uint256 originalAmount;
         uint256 price;
         bool matched;
     }
@@ -55,7 +56,8 @@ contract AssetManager {
             amount: o.amount,
             price: o.price,
             matched: o.matched,
-            orderStrategy: o.orderStrategy
+            orderStrategy: o.orderStrategy,
+            originalAmount: o.originalAmount
         });
 
         return newOrder;
@@ -71,6 +73,7 @@ contract AssetManager {
         to.amount = from.amount;
         to.price = from.price;
         to.matched = from.matched;        
+        to.originalAmount = from.originalAmount;
     }
 
     function _validateOrder(OrderRequest memory order) private pure {
@@ -156,6 +159,7 @@ contract AssetManager {
         lastOrderId = 0;
     }
 
+    // TODO: Test this method
     function fundAccount(address toAddress, uint256 amount) public {
         ngnc[msg.sender] = sub(ngnc[msg.sender], amount);
         ngnc[toAddress] = add(ngnc[toAddress], amount);
@@ -269,7 +273,7 @@ contract AssetManager {
                         quantity: 0,
                         decimal: asset.decimal,
                         owner: msg.sender,
-                        issuer: asset.issuer
+                        issuer: asset.issuer                        
                     });
                     assets[lastAssetId] = buyerAsset;     
                     lastAssetId = add(lastAssetId, 1);
@@ -296,6 +300,7 @@ contract AssetManager {
                 buyer: buyer,
                 assetName: orderRequest.assetName,
                 amount: orderRequest.amount,
+                originalAmount: orderRequest.amount,
                 price: orderRequest.price,
                 matched: false
             });
