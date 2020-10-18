@@ -1,13 +1,13 @@
 const Web3 = require('web3');
-const props = require('../../config/config');
+const props = require('./config/config');
 const path = require('path');
 const fs = require('fs');
 
 const web3 = new Web3(props.web3URL);
-const contractAddress = '0x9d8385d41298DfBD37652EB78D96768D5e7070bA';
-const abiPath = '/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_AssetManager_sol_AssetManager.abi';
+const contractAddress = '0x0D0eff6f18e70253f2BD653DF9f9FE36994790d6';
+const abiPath = '/Users/aardvocate/src/SmartContractCreator/build/contracts/AssetManager.json';
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
-const AssetManagerContract = new web3.eth.Contract(abi, contractAddress);
+const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
 
 function importAddress() {
     // main mac - default
@@ -319,7 +319,7 @@ async function start() {
     getOrders((allOrders) => { console.log(allOrders) });
 }
 
-//start();
+start();
 //processEvents();
 //importAddress();
 //createAssets();
@@ -338,4 +338,4 @@ async function start() {
 //getBuyOrders((allOrders) => {console.log(allOrders)});
 //getSellOrders((allOrders) => {console.log(allOrders)});
  //getMatchedOrders((allOrders) => {console.log(allOrders)});
-getUserOrders(props.user2.address, (allOrders) => {console.log(allOrders)});
+//getUserOrders(props.user2.address, (allOrders) => {console.log(allOrders)});
