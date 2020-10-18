@@ -5,7 +5,7 @@ const fs = require('fs');
 const { assert, expect } = require('chai');
 
 const web3 = new Web3(props.web3URL);
-const contractAddress = '0x000c85AF767761bb8dB9e29e0F87acdF82c21593';
+const contractAddress = props.contractAddress;
 const abiPath = '/Users/aardvocate/src/SmartContractCreator/build/contracts/AssetManager.json';
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
@@ -99,7 +99,7 @@ describe('AssetManager Tests', () => {
         });
     }).timeout(TIMEOUT);
 
-    it.only('should post an order', (done) => {
+    it('should post an order', (done) => {
         const orderRequest = {
             orderType: 0,
             orderStrategy: 0,
@@ -108,18 +108,46 @@ describe('AssetManager Tests', () => {
             assetName: 'BUD',
             assetIssuer: props.address,
         }
-    
+        
+        const value = 1500;
         web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
             AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
                 console.log("Order Posted");
                 getOrders((orders) => {
-                    let order = orders[0];
+                    let order = orders[orders.length - 1];
                     testOrder(order);
-                    assert.equal(+order.amount, 1500, "order amoun should be 1500");
-                    assert.equal(+order.price, 1, "order amoun should be 1");
+                    assert.equal(+order.amount, 1500, "order amount should be 1500");
+                    assert.equal(+order.price, 1, "order price should be 1");
                     done();
                 })
             });
         });        
-    })
+    }).timeout(TIMEOUT);
+
+    it('should match previous order', (done) => {
+        const orderRequest = {
+            orderType: 1,
+            orderStrategy: 0,
+            amount: 1500,
+            price: 1,
+            assetName: 'BUD',
+            assetIssuer: props.address,
+        }
+        
+        const value = 1500;
+        web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
+            AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+                console.log("Order Posted");
+                getOrders((orders) => {
+                    let order = orders[orders.length - 1];
+                    testOrder(order);
+                    assert.equal(+order.amount, 0, "order amount should be 0, it would have been matched");
+                    assert.equal(+order.originalAmount, 1500, "order original amount should still be 1500");
+                    assert.equal(+order.price, 1, "order price should be 1");
+                    assert.isTrue(order.matched, "order should be matched");
+                    done();
+                })
+            });
+        });        
+    }).timeout(TIMEOUT);    
 });
