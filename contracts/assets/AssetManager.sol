@@ -320,20 +320,48 @@ contract AssetManager {
         return allOrders;
     }    
 
-    function getBuyOrders() public returns (Order[] memory) {
-        //TODO: Implement
+    function getBuyOrders() public view returns (Order[] memory) {
+        Order[] memory allOrders = new Order[](lastOrderId);
+        for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {    
+            if(orders[i].orderType == OrderType.BUY) {
+                allOrders[i] = orders[i];
+            }
+        }
+
+        return allOrders;
     }        
 
-    function getSellOrders() public returns (Order[] memory) {
-        //TODO: Implement
+    function getSellOrders() public view returns (Order[] memory) {
+        Order[] memory allOrders = new Order[](lastOrderId);
+        for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {    
+            if(orders[i].orderType == OrderType.SELL) {
+                allOrders[i] = orders[i];
+            }
+        }
+
+        return allOrders;
     }
 
-    function getMatchedOrders() public returns (Order[] memory) {
-        //TODO: Implement
+    function getMatchedOrders() public view returns (Order[] memory) {
+        Order[] memory allOrders = new Order[](lastOrderId);
+        for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {    
+            if(orders[i].matched) {
+                allOrders[i] = orders[i];
+            }
+        }
+
+        return allOrders;
     }
 
-    function getUserOrders(address user) public returns (Order[] memory) {
-        //TODO: Implement
+    function getUserOrders(address user) public view returns (Order[] memory) {
+        Order[] memory allOrders = new Order[](lastOrderId);
+        for(uint256 i = 0; i < lastOrderId; i = add(1, i)) {    
+            if(orders[i].buyer == user || orders[i].seller == user) {
+                allOrders[i] = orders[i];
+            }
+        }
+
+        return allOrders;
     } 
 
     function getAssets() public view returns (Asset[] memory) {        
