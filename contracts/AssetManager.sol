@@ -241,9 +241,8 @@ contract AssetManager {
             orders[loi] = dbOrder;
             lastOrderId = add(1, lastOrderId);
 
-            // try and match the matchingOrder with previously posted orders        
-            OrderModel.Order memory matchingOrder;
-            OrderModel.copyOrder(dbOrder, matchingOrder);
+            // try and match the matchingOrder with previously posted orders                    
+            OrderModel.Order memory matchingOrder = OrderModel.copyOrder(dbOrder);
             emit OrderPosted(matchingOrder);
             _matchOrder(matchingOrder, loi);
         }
@@ -339,7 +338,7 @@ contract AssetManager {
         uint256 toBuy = 0;
         uint256 toSell = 0;
         //Asset memory asset = assets[matchingOrder.assetId];
-        while(i < loi && matched == false) {            
+        while(i < loi && matched == false) {       
             OrderModel.Order memory toMatch = orders[i];
             bool assetNameEquals = keccak256(bytes(matchingOrder.assetName)) == keccak256(bytes(toMatch.assetName));
             bool sameType = toMatch.orderType == matchingOrder.orderType;
@@ -355,16 +354,16 @@ contract AssetManager {
             if(shouldProcess) {               
 
                 if(matchingOrder.orderType == OrderModel.OrderType.BUY) {
-                    OrderModel.Order memory buyOrder;
+                    
                     //copy matchingOrder into buyOrder
-                    OrderModel.copyOrder(matchingOrder, buyOrder);
+                    OrderModel.Order memory buyOrder = OrderModel.copyOrder(matchingOrder);
 
                     // match buy to sell
                     // 1. Copy toMatch into sellOrder
                     // 2. Process the order
                     // 3. Copy updated buyOrder into matchingOrder
-                    OrderModel.Order memory sellOrder;
-                    OrderModel.copyOrder(toMatch, sellOrder);
+                    
+                    OrderModel.Order memory sellOrder = OrderModel.copyOrder(toMatch);
                     if(sellOrder.orderType == OrderModel.OrderType.SELL) {
                         (matched, toBuy, toSell) = _processOrder(buyOrder, sellOrder);
                         if(matched) {
@@ -375,19 +374,19 @@ contract AssetManager {
                             ngnc[sellOrder.seller] = add(sellerBalance, totalCost);
                             escrow[buyOrder.buyer] = sub(buyerBalance, totalCost);                    
                         }                        
-                        OrderModel.copyOrder(orders[buyOrder.id], matchingOrder );
+                        matchingOrder = OrderModel.copyOrder(orders[buyOrder.id]);
                     }                    
                 } else if(matchingOrder.orderType == OrderModel.OrderType.SELL) {
-                    OrderModel.Order memory sellOrder;
+                    
                     //copy matchingOrder into sellOrder
-                    OrderModel.copyOrder(matchingOrder, sellOrder);
+                    OrderModel.Order memory sellOrder = OrderModel.copyOrder(matchingOrder);
                     
                     // match sell to buy
                     // 1. Copy toMatch into buyOrder
                     // 2. Process the order
                     // 3. Copy updated sellOrder into matchingOrder
-                    OrderModel.Order memory buyOrder;
-                    OrderModel.copyOrder(toMatch, buyOrder);
+                    
+                    OrderModel.Order memory buyOrder = OrderModel.copyOrder(toMatch);
                     if(buyOrder.orderType == OrderModel.OrderType.BUY) {
                         (matched, toBuy, toSell) = _processOrder(buyOrder, sellOrder);
                         if(matched) {
@@ -398,7 +397,7 @@ contract AssetManager {
                             ngnc[sellOrder.seller] = add(sellerBalance, totalCost);
                             escrow[buyOrder.buyer] = sub(buyerBalance, totalCost);                    
                         }                        
-                        OrderModel.copyOrder(orders[sellOrder.id], matchingOrder );
+                        matchingOrder = OrderModel.copyOrder(orders[sellOrder.id]);
                     }
                 }                
             } else {

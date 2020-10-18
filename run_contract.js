@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const web3 = new Web3(props.web3URL);
-const contractAddress = '0x9832972039DB927a94E7EaB2DCa3c648BfA524e6';
+const contractAddress = '0xc822835dC912d58a46C9ECc17004858FCefB2C54';
 const abiPath = '/Users/aardvocate/src/SmartContractCreator/build/contracts/AssetManager.json';
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
@@ -24,9 +24,12 @@ function processEvents() {
     }).then(function (events) {
         for (e of events) {
             console.error(e.event);
-            if(e.event == 'DEBUG') {
+            if(e.event === 'DEBUG') {
                 console.error(e.returnValues['str']);
             }
+            if(e.event === 'OrderPosted') {
+                console.error(e.returnValues['order']);
+            }            
         }
     });
 }
@@ -319,7 +322,7 @@ async function start() {
     getOrders((allOrders) => { console.log(allOrders) });
 }
 
-start();
+//start();
 //processEvents();
 //importAddress();
 //createAssets();
@@ -333,7 +336,7 @@ start();
 //postOrder('SELL', 'PARTIAL', 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
 //postOrder('BUY', 'PARTIAL', 783, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
 //postOrderWithAddress(props.user2.address, props.user2.password, 'SELL', 'PARTIAL', 167, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
-//getOrders((allOrders) => { console.log(allOrders) });
+getOrders((allOrders) => { console.log(allOrders) });
 
 //getBuyOrders((allOrders) => {console.log(allOrders)});
 //getSellOrders((allOrders) => {console.log(allOrders)});

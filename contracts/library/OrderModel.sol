@@ -52,7 +52,7 @@ library OrderModel {
         return newOrder;
     }
 
-    function copyOrder(Order memory from, Order memory to) public pure {
+    function copyOrder(Order memory from) public pure returns (Order memory to) {
         to.id = from.id;
         to.orderType = from.orderType;
         to.orderStrategy = from.orderStrategy;
@@ -63,6 +63,8 @@ library OrderModel {
         to.price = from.price;
         to.matched = from.matched;        
         to.originalAmount = from.originalAmount;
+
+        return to;
     }
 
     function validateOrder(OrderRequest memory order) public pure {

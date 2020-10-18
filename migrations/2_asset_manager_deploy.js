@@ -5,5 +5,6 @@ const OrderModel = artifacts.require("OrderModel");
 module.exports = function (deployer) {
   deployer.deploy(OrderModel, {overwrite: false});
   deployer.link(OrderModel, AssetManager);
-  deployer.deploy(AssetManager, {gas: props.gas});
+  //deployer.deploy(AssetManager, {gas: props.gas});
+  deployer.deploy(AssetManager);
 };
