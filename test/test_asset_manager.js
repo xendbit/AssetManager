@@ -65,7 +65,7 @@ describe('AssetManager Tests', () => {
     it('should transfer asset', (done) => {
         let address = props.user1.address;
         let assetName = 'BUD';
-        let amount = 3125;
+        let amount = 31251;
         web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
             AssetManagerContract.methods.transferAsset(address, assetName, amount).send({ from: props.address }).then(() => {
                 console.log("Asset Transfered");
@@ -83,7 +83,7 @@ describe('AssetManager Tests', () => {
 
     it('should transfer token', (done) => {
         let address = props.user1.address;
-        let amount = 2345;
+        let amount = 23451;
         web3.eth.personal.unlockAccount(props.contractor, 'Wq017kmg@tm').then(() => {
             AssetManagerContract.methods.transferToken(address, amount).send({ from: props.contractor }).then(() => {
                 console.log("Token Transfered");
@@ -238,7 +238,6 @@ describe('AssetManager Tests', () => {
             assetIssuer: props.address,
         }
         
-        const value = 1500;
         web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
             AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
                 console.log("Order Posted");
