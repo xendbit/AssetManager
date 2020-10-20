@@ -23,6 +23,8 @@ library OrderModel {
         uint256 originalAmount;
         uint256 price;
         bool matched;
+        uint256 orderDate;
+        uint256 matchedDate;
     } 
 
     // Price must be in wei
@@ -46,7 +48,9 @@ library OrderModel {
             price: o.price,
             matched: o.matched,
             orderStrategy: o.orderStrategy,
-            originalAmount: o.originalAmount
+            originalAmount: o.originalAmount,
+            orderDate: o.orderDate,
+            matchedDate: o.matchedDate
         });
 
         return newOrder;
@@ -63,6 +67,8 @@ library OrderModel {
         to.price = from.price;
         to.matched = from.matched;        
         to.originalAmount = from.originalAmount;
+        to.orderDate = from.orderDate;
+        to.matchedDate = from.matchedDate;
 
         return to;
     }

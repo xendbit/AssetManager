@@ -4,9 +4,10 @@ const Web3 = require('web3');
 const props = require('./config/config');
 
 
-async function deploy(abiPath, binPath) {    
-    const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
-    const bin = fs.readFileSync(path.resolve(binPath), 'utf8');
+async function deploy(jsonPath) {    
+    const json =JSON.parse(fs.readFileSync(path.resolve(jsonPath), 'utf8')); 
+    const abi = json.abi;
+    const bin = json.bytecode;
     const web3 = new Web3(props.web3URL);
     const privKey = props.privKey;
     const address = props.address;    
@@ -39,7 +40,7 @@ async function deploy(abiPath, binPath) {
 }
 
 async function run() {
-    res = await deploy('/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_AssetManager_sol_AssetManager.abi', '/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/_AssetManager_sol_AssetManager.bin');
+    res = await deploy('/Users/aardvocate/src/SmartContractCreator/build/contracts/ArrayMappingTest.json');
     console.log("AssetManager: --> ", res);
     //res = await deploy('/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/__contracts_NGNC_sol_NGNC.abi', '/Users/aardvocate/src/SmartContractCreator/contracts/assets/output/__contracts_NGNC_sol_NGNC.bin');
     //console.log("NGNC: --> ", res);
