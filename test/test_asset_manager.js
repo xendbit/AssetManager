@@ -290,14 +290,14 @@ describe('AssetManager Tests', () => {
         });        
     }).timeout(TIMEOUT);     
     
-    // it('should get buy orders', (done) => {
-    //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-    //         getFilteredOrders('BUY', (orders) => {
-    //             expect(orders).to.be.an("array").with.length.above(0);
-    //             done();
-    //         });
-    //     });
-    // }).timeout(TIMEOUT);
+    it('should get buy orders', (done) => {
+        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+            getFilteredOrders('BUY', (orders) => {
+                expect(orders).to.be.an("array").with.length.above(0);
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
     // it('should get sell orders', (done) => {
     //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
     //         getFilteredOrders('SELL', (orders) => {

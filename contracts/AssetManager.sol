@@ -230,7 +230,19 @@ contract AssetManager {
         }
 
         return allOrders;
-    } 
+    }
+
+    function getBuyOrders() public view returns (OrderModel.Order[] memory) {        
+        uint256[] memory fo = filteredOrders[BUY_ORDERS_KEY];
+        uint256 size = fo.length;
+        OrderModel.Order[] memory allOrders = new OrderModel.Order[](size);
+        for(uint256 i = 0; i < size; i = Math.add(1, i)) {
+            uint256 index = fo[i];
+            allOrders[i] = orders[index];
+        }
+
+        return allOrders;
+    }     
 
     function getUserOrders(address user) public view returns (OrderModel.Order[] memory) {
         uint256 size = userOrders[user].length;
