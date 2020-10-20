@@ -221,35 +221,46 @@ contract AssetManager {
         }
     }
 
-    function getOrders() public view returns (OrderModel.Order[] memory) {        
-        uint256 size = filteredOrders[PENDING_ORDERS_KEY].length;
-        OrderModel.Order[] memory allOrders = new OrderModel.Order[](size);
-        for(uint256 i = 0; i < size; i = Math.add(1, i)) {
-            uint256 index = filteredOrders[PENDING_ORDERS_KEY][i];
-            allOrders[i] = orders[index];
-        }
+    // function cancelOrder(uint256 orderId) public {
+    //     OrderModel.Order memory exists = orders[orderId];
 
-        return allOrders;
+    //     if(exists.orderDate > 0 && (exists.buyer != address(0) || exists.seller != address(0)) && exists.matched == false) {
+    //         uint256 index = exists.index;
+    //         uint256 lastIndex = filteredOrders[PENDING_ORDERS_KEY].length - 1;
+
+    //         if(lastIndex >= 0) {
+    //             // copy last element into index;
+    //             filteredOrders[PENDING_ORDERS_KEY][index] = filteredOrders[PENDING_ORDERS_KEY][lastIndex];
+    //             // update last element index
+    //             orders[filteredOrders[PENDING_ORDERS_KEY][lastIndex]].index = index;
+    //             // delete last element
+    //             filteredOrders[PENDING_ORDERS_KEY].pop();
+    //         }
+    //     }
+    // }
+
+    function getOrders() public view returns (OrderModel.Order[] memory) {        
+        return _getFilteredOrders(PENDING_ORDERS_KEY);
     }
 
     function getBuyOrders() public view returns (OrderModel.Order[] memory) {        
-        uint256[] memory fo = filteredOrders[BUY_ORDERS_KEY];
-        uint256 size = fo.length;
-        OrderModel.Order[] memory allOrders = new OrderModel.Order[](size);
-        for(uint256 i = 0; i < size; i = Math.add(1, i)) {
-            uint256 index = fo[i];
-            allOrders[i] = orders[index];
-        }
+        return _getFilteredOrders(BUY_ORDERS_KEY);
+    }
 
-        return allOrders;
-    }     
+    function getSellOrders() public view returns (OrderModel.Order[] memory) {        
+        return _getFilteredOrders(SELL_ORDERS_KEY);
+    }
+
+    function getMatchedOrders() public view returns (OrderModel.Order[] memory) {        
+        return _getFilteredOrders(MATCHED_ORDERS_KEY);
+    }    
 
     function getUserOrders(address user) public view returns (OrderModel.Order[] memory) {
         uint256 size = userOrders[user].length;
 
         OrderModel.Order[] memory allOrders = new OrderModel.Order[](size);
         for(uint256 i = 0; i < size; i = Math.add(1, i)) {    
-            uint256 index = filteredOrders[PENDING_ORDERS_KEY][i];
+            uint256 index = userOrders[user][i];
             allOrders[i] = orders[index];
         }
 
@@ -469,6 +480,18 @@ contract AssetManager {
             filteredOrders[PENDING_ORDERS_KEY].pop();
         }
     }
+
+    function _getFilteredOrders(bytes32 key) public view returns (OrderModel.Order[] memory) {        
+        uint256[] memory fo = filteredOrders[key];
+        uint256 size = fo.length;
+        OrderModel.Order[] memory allOrders = new OrderModel.Order[](size);
+        for(uint256 i = 0; i < size; i = Math.add(1, i)) {
+            uint256 index = fo[i];
+            allOrders[i] = orders[index];
+        }
+
+        return allOrders;
+    }    
 
     function _getAssetByName(string memory name) private view returns (AssetModel.Asset memory) {
         for(uint256 i = 0; i < lastAssetId; i = Math.add(1, i)) {

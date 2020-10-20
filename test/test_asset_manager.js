@@ -298,28 +298,28 @@ describe('AssetManager Tests', () => {
             });
         });
     }).timeout(TIMEOUT);
-    // it('should get sell orders', (done) => {
-    //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-    //         getFilteredOrders('SELL', (orders) => {
-    //             expect(orders).to.be.an("array").with.length.above(0);
-    //             done();
-    //         });
-    //     });
-    // }).timeout(TIMEOUT);
-    // it('should get matched orders', (done) => {
-    //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-    //         getFilteredOrders('MATCHED', (orders) => {
-    //             expect(orders).to.be.an("array").with.length.above(0);
-    //             done();
-    //         });
-    //     });
-    // }).timeout(TIMEOUT);
-    // it('should get user orders', (done) => {
-    //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-    //         getFilteredOrders(props.address, (orders) => {
-    //             expect(orders).to.be.an("array").with.length.above(0);
-    //             done();
-    //         });
-    //     });
-    // }).timeout(TIMEOUT);    
+    it('should get sell orders', (done) => {
+        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+            getFilteredOrders('SELL', (orders) => {
+                expect(orders).to.be.an("array").with.length.above(0);
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+    it('should get matched orders', (done) => {
+        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+            getFilteredOrders('MATCHED', (orders) => {
+                expect(orders).to.be.an("array").with.length.above(0);
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+    it('should get user orders', (done) => {
+        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+            getFilteredOrders(props.address, (orders) => {
+                expect(orders).to.be.an("array").with.length.above(0);
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);    
 });
