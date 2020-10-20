@@ -14,6 +14,7 @@ library OrderModel {
      */
     struct Order {
         uint256 id;
+        uint256 index;
         OrderType orderType;
         OrderStrategy orderStrategy;
         address seller;
@@ -35,42 +36,6 @@ library OrderModel {
         uint256 price;
         string assetName;
         address assetIssuer;
-    }
-
-    function cloneOrder(Order memory o) public pure returns (Order memory) {
-        Order memory newOrder = Order({
-            id: o.id,
-            orderType: o.orderType,
-            seller: o.seller,
-            buyer: o.buyer,
-            assetName: o.assetName,
-            amount: o.amount,
-            price: o.price,
-            matched: o.matched,
-            orderStrategy: o.orderStrategy,
-            originalAmount: o.originalAmount,
-            orderDate: o.orderDate,
-            matchedDate: o.matchedDate
-        });
-
-        return newOrder;
-    }
-
-    function copyOrder(Order memory from) public pure returns (Order memory to) {
-        to.id = from.id;
-        to.orderType = from.orderType;
-        to.orderStrategy = from.orderStrategy;
-        to.seller = from.seller;
-        to.buyer = from.buyer;
-        to.assetName = from.assetName;
-        to.amount = from.amount;
-        to.price = from.price;
-        to.matched = from.matched;        
-        to.originalAmount = from.originalAmount;
-        to.orderDate = from.orderDate;
-        to.matchedDate = from.matchedDate;
-
-        return to;
     }
 
     function validateOrder(OrderRequest memory order) public pure {

@@ -3,7 +3,7 @@ const properties = {
     privKey: '416923edfd58ab2fe988a317a0a4adb6d89c19abce5816686d9a573073e7ca67',
     address: '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc',
     contractor: '0xB6D80F6d661927afEf42f39e52d630E250696bc4',
-    contractAddress: '0x49014bdF8F78d7322Bfa903c7054F4e1374C7C5C',
+    contractAddress: '0xdF9D481BA12BEa70E7236389309df2C1C43Fbd67',
     gas: '4004356',
     user1: {
         privKey: "c5fd8168f094e64e585be23c240b01ed6da7dbe783cf47421f8472214bf701b0",

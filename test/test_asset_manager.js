@@ -9,7 +9,7 @@ const contractAddress = props.contractAddress;
 const abiPath = '/Users/aardvocate/src/SmartContractCreator/build/contracts/AssetManager.json';
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
-const TIMEOUT = 60000;
+const TIMEOUT = 120000;
 
 function getAssets(callback) {
     AssetManagerContract.methods.getAssets().call({ from: props.address }).then(result => {
@@ -20,9 +20,33 @@ function getAssets(callback) {
 
 function getOrders(callback) {
     AssetManagerContract.methods.getOrders().call({ from: props.address }).then(result => {
-        expect(result).to.be.a("array").to.have.length.above(0);
+        expect(result).to.be.an("array");
         callback(result);
     });    
+}
+
+function getFilteredOrders(key, callback) {
+    if(key === 'BUY') {
+        AssetManagerContract.methods.getBuyOrders().call({ from: props.address }).then(result => {
+            expect(result).to.be.an("array");
+            callback(result);
+        });        
+    } else if(key === 'SELL') {
+        AssetManagerContract.methods.getSellOrders().call({ from: props.address }).then(result => {
+            expect(result).to.be.an("array");
+            callback(result);
+        });                
+    } else if(key === 'MATCHED') {
+        AssetManagerContract.methods.getMatchedOrders().call({ from: props.address }).then(result => {
+            expect(result).to.be.an("array");
+            callback(result);
+        });                
+    } else if(key.indexOf('0x') === 0) {
+        AssetManagerContract.methods.getUserOrders(key).call({ from: props.address }).then(result => {
+            expect(result).to.be.an("array");
+            callback(result);
+        });                
+    }
 }
 
 function testOrder(order) {
@@ -139,14 +163,9 @@ describe('AssetManager Tests', () => {
             AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
                 console.log("Order Posted");
                 getOrders((orders) => {
-                    let order = orders[orders.length - 1];
-                    testOrder(order);
-                    assert.equal(+order.amount, 0, "order amount should be 0, it would have been matched");
-                    assert.equal(+order.originalAmount, 1500, "order original amount should still be 1500");
-                    assert.equal(+order.price, 1, "order price should be 1");
-                    assert.isTrue(order.matched, "order should be matched");
+                    expect(orders).to.be.an("array");
                     done();
-                })
+                });
             });
         });        
     }).timeout(TIMEOUT);    
@@ -191,14 +210,9 @@ describe('AssetManager Tests', () => {
             AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
                 console.log("Order Posted");
                 getOrders((orders) => {
-                    let order = orders[orders.length - 1];
-                    testOrder(order);
-                    assert.equal(+order.amount, 0, "order amount should be 0, it would have been matched");
-                    assert.equal(+order.originalAmount, 1500, "order original amount should still be 1500");
-                    assert.equal(+order.price, 1, "order price should be 1");
-                    assert.isTrue(order.matched, "order should be matched");
+                    expect(orders).to.be.an("array");
                     done();
-                })
+                });
             });
         });        
     }).timeout(TIMEOUT);  
@@ -267,17 +281,45 @@ describe('AssetManager Tests', () => {
         const value = 1500;
         web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
             AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
-                console.log("Order Posted");
+                console.log("Order Posted");                
                 getOrders((orders) => {
-                    let order = orders[orders.length - 1];
-                    testOrder(order);
-                    assert.equal(+order.amount, 0, "order amount should be 0, it would have been matched");
-                    assert.equal(+order.originalAmount, 1500, "order original amount should still be 1500");
-                    assert.equal(+order.price, 1, "order price should be 1");
-                    assert.isTrue(order.matched, "order should be matched");
+                    expect(orders).to.be.an("array");
                     done();
                 })
             });
         });        
-    }).timeout(TIMEOUT);      
+    }).timeout(TIMEOUT);     
+    
+    // it('should get buy orders', (done) => {
+    //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+    //         getFilteredOrders('BUY', (orders) => {
+    //             expect(orders).to.be.an("array").with.length.above(0);
+    //             done();
+    //         });
+    //     });
+    // }).timeout(TIMEOUT);
+    // it('should get sell orders', (done) => {
+    //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+    //         getFilteredOrders('SELL', (orders) => {
+    //             expect(orders).to.be.an("array").with.length.above(0);
+    //             done();
+    //         });
+    //     });
+    // }).timeout(TIMEOUT);
+    // it('should get matched orders', (done) => {
+    //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+    //         getFilteredOrders('MATCHED', (orders) => {
+    //             expect(orders).to.be.an("array").with.length.above(0);
+    //             done();
+    //         });
+    //     });
+    // }).timeout(TIMEOUT);
+    // it('should get user orders', (done) => {
+    //     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+    //         getFilteredOrders(props.address, (orders) => {
+    //             expect(orders).to.be.an("array").with.length.above(0);
+    //             done();
+    //         });
+    //     });
+    // }).timeout(TIMEOUT);    
 });
