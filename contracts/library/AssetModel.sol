@@ -1,5 +1,5 @@
 /// SPDX-License-Identifier: MIT-0
-pragma solidity ^0.7.2;
+pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 library AssetModel {

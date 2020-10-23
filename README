@@ -1,0 +1,71 @@
+# Asset Manager
+
+Most ethereum smart contracts do a few things
+
+	1. Create the smart contract
+	2. Transfer the token from one address to another
+	3. Check balance of tokens per address
+	4. Delegat tokens to another address
+
+The idea behind this is to have a smart contract that can allow you to issue assets (tokens), keep an internal record of issued tokens and their owners and then allow you to perform the above 4 actions. 
+
+In addition, this contract gives you the ability to trade the contracts. You can post BUY/SELL orders and the contract provides a simple matching engine to match the trades.
+
+
+check the tests/test_asset_manager.js for examples of how the contract can be called.
+
+
+### Developers
+
+Open truffle-config.js and set your Ethereum Node config 
+
+```
+    development: {
+      host: "127.0.0.1",     // Localhost (default: none)
+      port: 8545,            // Standard Ethereum port (default: none)
+      network_id: "1337",       // Any network (default: none)
+      //from: '0xA21983B35C767CF8609D95F4886C9A18A194D8AA' // acount that will deploy the smart contract
+    },
+```
+
+Then run the below
+
+```   
+npm install chai mocha rimraf web3
+npm run build
+npm run deploy
+```
+
+Make sure you have an unlocked account on the node. Truffle will automatically use the eth.coinbase address, if you want to use another account, you can specify it in the `from` property. 
+
+
+Thed edit the config/config.json and specify the propertties. Make sure the accounts specified are unlocked.
+
+```
+const properties = {
+    web3URL: 'http://127.0.0.1:8545',//'http://209.250.234.75:8545',
+    address: '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', // any unlocked address on the server
+    contractor: '0xB6D80F6d661927afEf42f39e52d630E250696bc4', // contract deployer
+    contractAddress: '0x8E80fE51C0c80Ef9a936797A8a4dF38417e08E5a', // address of contract after deploy
+    abiPath: 'build/contracts/AssetManager.json',
+    gas: '4004356',
+    // another unlocked account on the server
+    user1: {
+        password: "Wq017kmg@tm",
+        address: "0xC04915f6b3ff85b50A863eB1FcBF368171539413",
+    },
+    // another unlocked account on the server
+    user2: {
+        password: "Wq017kmg@tm",
+        address: "0xf0eB683bb243eCE4Fe94494E4014628AfCb6Efe5",
+    },  
+}
+
+module.exports = properties;
+```
+
+Then you can run 
+
+`npm run test`
+
+To run the tests.

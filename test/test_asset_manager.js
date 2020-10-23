@@ -98,6 +98,7 @@ describe('AssetManager Tests', () => {
                     testAsset(asset);                    
                     expect(asset).to.have.property("quantity");
                     let q = +asset['quantity'];
+                    console.log(q);
                     expect(q).to.be.gte(3125);
                     done();
                 })
