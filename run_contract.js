@@ -5,7 +5,7 @@ const fs = require('fs');
 
 const web3 = new Web3(props.web3URL);
 const contractAddress = props.contractAddress;
-const abiPath = '/Users/aardvocate/src/SmartContractCreator/build/contracts/AssetManager.json';
+const abiPath = props.abiPath;
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
 
@@ -18,19 +18,23 @@ function importAddress() {
 
 function processEvents() {
     // to process all past events 
-    AssetManagerContract.getPastEvents('allEvents', {
-        fromBlock: 0,
-        toBlock: 'latest'
-    }).then(function (events) {
-        for (e of events) {
-            console.error(e.event);
-            if(e.event === 'DEBUG') {
-                console.error(e.returnValues['str']);
+    console.log('Processing Events.....');
+    web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.getPastEvents('allEvents', {
+            fromBlock: 0,
+            toBlock: 'latest'
+        }).then(function (events) {
+            console.log(events);
+            for (e of events) {
+                console.error(e.event);
+                if (e.event === 'DEBUG') {
+                    console.error(e.returnValues['str']);
+                }
+                if (e.event === 'OrderPosted') {
+                    //console.error(e.returnValues['order']);
+                }
             }
-            if(e.event === 'OrderPosted') {
-                //console.error(e.returnValues['order']);
-            }            
-        }
+        });
     });
 }
 
@@ -156,7 +160,7 @@ function postOrder(orderType, orderStrategy, amount, price, assetName, assetIssu
 }
 
 function postOrderWithAddress(address, password, orderType, orderStrategy, amount, price, assetName, assetIssuer) {
-    
+
     const orderRequest = {
         orderType: orderType === 'BUY' ? 0 : 1,
         orderStrategy: orderStrategy === 'PARTIAL' ? 0 : 1,
@@ -188,6 +192,22 @@ function getOrders(callback) {
         });
     });
 }
+
+function getAllOrders(callback) {
+    let allOrders = [];
+    web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.methods.getAllOrders().call({ from: props.address, gas: props.gas, }).then((result) => {
+            for (res of result) {
+                if (res.id >= 0) {
+                    order = populateOrder(res);
+                    allOrders.push(order);
+                }
+            }
+            callback(allOrders);
+        });
+    });
+}
+
 
 function getBuyOrders(callback) {
     let allOrders = [];
@@ -260,7 +280,9 @@ function populateOrder(res) {
         amount: res.amount,
         originalAmount: res.originalAmount,
         price: res.price,
-        matched: res.matched
+        matched: res.matched,
+        index: res.index,
+        orderDate: res.orderDate
     }
 
     return order;
@@ -311,12 +333,23 @@ function transferAsset(address, amount, assetName) {
     });
 }
 
+function getBalances() {
+    let allOrders = [];
+    web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.methods.getTokenBalance().call({ from: props.user1.address, gas: props.gas, }).then((result) => {
+            console.log(`Token Balance: ${result}`);
+            AssetManagerContract.methods.getEscrowBalance().call({ from: props.user1.address, gas: props.gas, }).then((result) => {
+                console.log(`Escrow Balance: ${result}`);
+            });
+        });
+    });
+}
 async function start() {
     createAssetsMini();
     await sleep(30000);
     transferAsset(props.user2.address, 3150, "BUD");
     await sleep(1000);
-    console.log("posting order 1");    
+    console.log("posting order 1");
     postOrder('BUY', 'PARTIAL', 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
     await sleep(15000);
     getOrders((allOrders) => { console.log(allOrders) });
@@ -324,6 +357,8 @@ async function start() {
 
 //start();
 //processEvents();
+//getAllOrders((allOrders) => { console.log(allOrders) });
+//getBalances();
 //importAddress();
 //createAssets();
 // transferAsset(props.user1.address, 200000000, 3);
@@ -338,7 +373,7 @@ async function start() {
 //postOrderWithAddress(props.user2.address, props.user2.password, 'SELL', 'PARTIAL', 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc');
 //getOrders((allOrders) => { console.log(allOrders) });
 
-getBuyOrders((allOrders) => {console.log(allOrders)});
-//getSellOrders((allOrders) => {console.log(allOrders)});
+//getBuyOrders((allOrders) => {console.log(allOrders)});
+getSellOrders((allOrders) => {console.log(allOrders)});
  //getMatchedOrders((allOrders) => {console.log(allOrders)});
 //getUserOrders(props.user2.address, (allOrders) => {console.log(allOrders)});

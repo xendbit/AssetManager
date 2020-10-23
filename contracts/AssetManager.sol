@@ -16,6 +16,7 @@ contract AssetManager {
     event DEBUG(uint256 str);
     event DEBUG(address str);
     event DEBUG(bool str);
+    event DEBUG(OrderModel.Order order);
 
     uint256 ONE_WEI = 1000000000000000000;
 
@@ -221,23 +222,34 @@ contract AssetManager {
         }
     }
 
-    // function cancelOrder(uint256 orderId) public {
-    //     OrderModel.Order memory exists = orders[orderId];
+    function cancelOrder(uint256 orderId) public {
+        OrderModel.Order memory exists = orders[orderId];
+        uint256 price = exists.price;
+        uint256 amount = exists.amount;
+        uint256 totalCost = Math.mul(amount, price);
 
-    //     if(exists.orderDate > 0 && (exists.buyer != address(0) || exists.seller != address(0)) && exists.matched == false) {
-    //         uint256 index = exists.index;
-    //         uint256 lastIndex = filteredOrders[PENDING_ORDERS_KEY].length - 1;
+        if(exists.orderDate > 0 && (exists.buyer != address(0) || exists.seller != address(0)) && exists.matched == false) {
+            uint256 index = exists.index;
+            uint256 lastIndex = filteredOrders[PENDING_ORDERS_KEY].length - 1;
 
-    //         if(lastIndex >= 0) {
-    //             // copy last element into index;
-    //             filteredOrders[PENDING_ORDERS_KEY][index] = filteredOrders[PENDING_ORDERS_KEY][lastIndex];
-    //             // update last element index
-    //             orders[filteredOrders[PENDING_ORDERS_KEY][lastIndex]].index = index;
-    //             // delete last element
-    //             filteredOrders[PENDING_ORDERS_KEY].pop();
-    //         }
-    //     }
-    // }
+            if(index == lastIndex && index == 0) {
+                filteredOrders[PENDING_ORDERS_KEY].pop();
+            } else if(lastIndex >= 0) {
+                // copy last element into index;
+                filteredOrders[PENDING_ORDERS_KEY][index] = filteredOrders[PENDING_ORDERS_KEY][lastIndex];
+                // update last element index
+                orders[filteredOrders[PENDING_ORDERS_KEY][lastIndex]].index = index;
+                // delete last element
+                filteredOrders[PENDING_ORDERS_KEY].pop();
+            }
+
+            // refund if buy order
+            if(exists.orderType == OrderModel.OrderType.BUY) {
+                ngnc[msg.sender] = Math.add(ngnc[msg.sender], totalCost);
+                escrow[msg.sender] = Math.sub(escrow[msg.sender], totalCost);                    
+            }            
+        }
+    }
 
     function getOrders() public view returns (OrderModel.Order[] memory) {        
         return _getFilteredOrders(PENDING_ORDERS_KEY);

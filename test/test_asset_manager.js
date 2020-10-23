@@ -6,10 +6,10 @@ const { assert, expect } = require('chai');
 
 const web3 = new Web3(props.web3URL);
 const contractAddress = props.contractAddress;
-const abiPath = '/Users/aardvocate/src/SmartContractCreator/build/contracts/AssetManager.json';
-const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
+const abi = JSON.parse(fs.readFileSync(path.resolve(props.abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
 const TIMEOUT = 120000;
+let cancelOrderId = -1;
 
 function getAssets(callback) {
     AssetManagerContract.methods.getAssets().call({ from: props.address }).then(result => {
@@ -107,7 +107,7 @@ describe('AssetManager Tests', () => {
 
     it('should transfer token', (done) => {
         let address = props.user1.address;
-        let amount = 23451;
+        let amount = 25000;
         web3.eth.personal.unlockAccount(props.contractor, 'Wq017kmg@tm').then(() => {
             AssetManagerContract.methods.transferToken(address, amount).send({ from: props.contractor }).then(() => {
                 console.log("Token Transfered");
@@ -115,7 +115,7 @@ describe('AssetManager Tests', () => {
                     AssetManagerContract.methods.getTokenBalance().call({ from: address }).then(result => {
                         console.log("Token Balance: ", result);
                         result = +result;
-                        expect(result).to.be.gte(2345);
+                        expect(result).to.be.gte(25000);
                         done();
                     });
                 });
@@ -258,6 +258,7 @@ describe('AssetManager Tests', () => {
                 getOrders((orders) => {
                     let order = orders[orders.length - 1];
                     testOrder(order);
+                    cancelOrderId = order.id;
                     assert.equal(+order.amount, 1700, "order amount should be 0, it would not have been matched");
                     assert.equal(+order.originalAmount, 1700, "order original amount should still be 1500");
                     assert.equal(+order.price, 1, "order price should be 1");
@@ -288,7 +289,21 @@ describe('AssetManager Tests', () => {
                 })
             });
         });        
-    }).timeout(TIMEOUT);     
+    }).timeout(TIMEOUT);  
+    
+    it('should cancel an order', (done) => {
+        console.log("Cancel Order ID: " + cancelOrderId);
+        web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
+            AssetManagerContract.methods.cancelOrder(cancelOrderId).send({ from: props.user1.address }).then(() => {
+                console.log('Order Cancelled');
+                AssetManagerContract.methods.getTokenBalance().call({ from: props.user1.address }).then(result => {
+                    console.log('Balance: ' + result);
+                    assert.isTrue(+result >= 20500, "After cancellation, we should have 20500");
+                });
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
     
     it('should get buy orders', (done) => {
         web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
