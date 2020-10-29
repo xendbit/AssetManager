@@ -8,64 +8,18 @@ const web3 = new Web3(props.web3URL);
 const contractAddress = props.contractAddress;
 const abi = JSON.parse(fs.readFileSync(path.resolve(props.abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
+AssetManagerContract.handleRevert = true;
 const TIMEOUT = 120000;
-let cancelOrderId = -1;
+let toMatchKey = undefined;
 
-function getAssets(callback) {
-    AssetManagerContract.methods.getAssets().call({ from: props.address }).then(result => {
-        expect(result).to.be.a("array").to.have.length.above(0);
-        callback(result);
-    });    
-}
+const { getAssets, getOrder, getOrderRequest, testAsset, testOrder, unlockAccounts } = require('./test_utils.js');
 
-function getOrders(callback) {
-    AssetManagerContract.methods.getOrders().call({ from: props.address }).then(result => {
-        expect(result).to.be.an("array");
-        callback(result);
-    });    
-}
+describe('AssetManager Assets & Tokens Tests', () => {
+    before(function (done) {
+        this.timeout(TIMEOUT);
+        unlockAccounts(done);
+    });
 
-function getFilteredOrders(key, callback) {
-    if(key === 'BUY') {
-        AssetManagerContract.methods.getBuyOrders().call({ from: props.address }).then(result => {
-            expect(result).to.be.an("array");
-            callback(result);
-        });        
-    } else if(key === 'SELL') {
-        AssetManagerContract.methods.getSellOrders().call({ from: props.address }).then(result => {
-            expect(result).to.be.an("array");
-            callback(result);
-        });                
-    } else if(key === 'MATCHED') {
-        AssetManagerContract.methods.getMatchedOrders().call({ from: props.address }).then(result => {
-            expect(result).to.be.an("array");
-            callback(result);
-        });                
-    } else if(key.indexOf('0x') === 0) {
-        AssetManagerContract.methods.getUserOrders(key).call({ from: props.address }).then(result => {
-            expect(result).to.be.an("array");
-            callback(result);
-        });                
-    }
-}
-
-function testOrder(order) {
-    expect(order).to.have.property("seller");
-    expect(order).to.have.property("buyer");
-    expect(order).to.have.property("originalAmount");
-    expect(order).to.have.property("amount");
-    expect(order).to.have.property("assetName").to.equal('BUD');
-    expect(order).to.have.property("price");
-}
-
-function testAsset(asset) {    
-    expect(asset).to.have.property("name").to.equal('BUD');
-    expect(asset).to.have.property("issuer");
-    expect(asset).to.have.property("owner");
-    expect(asset).to.have.property("decimal").to.equal('2');
-}
-
-describe('AssetManager Tests', () => {
     it('should create new asset', (done) => {
         const assetRequest = {
             name: 'BUD',
@@ -73,16 +27,13 @@ describe('AssetManager Tests', () => {
             totalQuantity: 100000000,
             decimal: 2
         }
-
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.createAsset(assetRequest).send({ from: props.address }).then(() => {
-                console.log("Asset Created");
-                getAssets((result) => {
-                    let asset = result[0];
-                    testAsset(asset);
-                    done()            
-                });
-            })
+        AssetManagerContract.methods.createAsset(assetRequest).send({ from: props.address }).then(() => {
+            console.log("Asset Created");
+            getAssets((result) => {
+                let asset = result[0];
+                testAsset(asset);
+                done()
+            });
         });
     }).timeout(TIMEOUT);
 
@@ -90,252 +41,261 @@ describe('AssetManager Tests', () => {
         let address = props.user1.address;
         let assetName = 'BUD';
         let amount = 31251;
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.transferAsset(address, assetName, amount).send({ from: props.address }).then(() => {
-                console.log("Asset Transfered");
-                getAssets((result) => {
-                    let asset = result[result.length - 1];
-                    testAsset(asset);                    
-                    expect(asset).to.have.property("quantity");
-                    let q = +asset['quantity'];
-                    console.log(q);
-                    expect(q).to.be.gte(3125);
-                    done();
-                })
-            });
-        });                
+        AssetManagerContract.methods.transferAsset(address, assetName, amount).send({ from: props.address }).then(() => {
+            console.log("Asset Transfered");
+            getAssets((result) => {
+                let asset = result[result.length - 1];
+                testAsset(asset);
+                expect(asset).to.have.property("quantity");
+                let q = +asset['quantity'];
+                console.log(q);
+                expect(q).to.be.gte(3125);
+                done();
+            })
+        });
     }).timeout(TIMEOUT);
 
     it('should transfer token', (done) => {
         let address = props.user1.address;
         let amount = 25000;
-        web3.eth.personal.unlockAccount(props.contractor, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.transferToken(address, amount).send({ from: props.contractor }).then(() => {
-                console.log("Token Transfered");
-                web3.eth.personal.unlockAccount(address, 'Wq017kmg@tm').then(() => {
-                    AssetManagerContract.methods.getTokenBalance().call({ from: address }).then(result => {
-                        console.log("Token Balance: ", result);
-                        result = +result;
-                        expect(result).to.be.gte(25000);
-                        done();
+        AssetManagerContract.methods.transferToken(address, amount).send({ from: props.contractor }).then(() => {
+            console.log("Token Transfered");
+            AssetManagerContract.methods.getTokenBalance().call({ from: address }).then(result => {
+                console.log("Token Balance: ", result);
+                result = +result;
+                expect(result).to.be.gte(25000);
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+});
+
+describe('AssetManager Normal Orders Test', () => {
+    it('should post (BUY) an order', (done) => {
+        const orderRequest = getOrderRequest(0, 0, 1500, 1, 'BUD', props.address, 0, props.address);
+        const value = 1500;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 0);
+                toMatchKey = order.key;
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+
+    it('should match (SELL) previous order', (done) => {
+        const orderRequest = getOrderRequest(1, 0, 1500, 1, 'BUD', props.address, 0, props.user1.address);
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, 0);
+                assert.equal(+order.originalAmount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 1);
+                if (toMatchKey !== undefined) {
+                    getOrder(toMatchKey, (order) => {
+                        testOrder(order);
+                        assert.equal(+order.amount, 0);
+                        assert.equal(+order.originalAmount, orderRequest.amount);
+                        assert.equal(+order.price, orderRequest.price);        
+                        assert.equal(+order.status, 1);
                     });
+                }
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+});
+
+describe('AssetManager ALL OR NOTHING Orders Test', () => {
+    it('should post (BUY) ALL_OR_NOTHING order', (done) => {
+        const orderRequest = getOrderRequest(0, 1, 1500, 1, 'BUD', props.address, 0, props.address);
+        const value = 1500;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
+            console.log("Order Posted");
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 0);
+                toMatchKey = order.key;
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+
+    it('should match (SELL) ALL_OR_NOTHING order', (done) => {
+        const orderRequest = getOrderRequest(1, 1, 1500, 1, 'BUD', props.address, 0, props.user1.address);
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, 0);
+                assert.equal(+order.originalAmount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 1);
+                if (toMatchKey !== undefined) {
+                    getOrder(toMatchKey, (order) => {
+                        testOrder(order);
+                        assert.equal(+order.amount, 0);
+                        assert.equal(+order.originalAmount, orderRequest.amount);
+                        assert.equal(+order.price, orderRequest.price);        
+                        assert.equal(+order.status, 1);
+                    });
+                }
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+
+    it('should post (BUY) ALL_OR_NOTHING order', (done) => {
+        const orderRequest = getOrderRequest(0, 1, 1500, 1, 'BUD', props.address, 0, props.address);
+        const value = 1500;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
+            console.log("Order Posted");
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 0);
+                toMatchKey = order.key;
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+
+    it ('should NOT match (SELL) ALL_OR_NOTHING order', (done) => {
+        const orderRequest = getOrderRequest(1, 1, 1700, 1, 'BUD', props.address, 0, props.user1.address);
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+            console.log("Order Posted");
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 0);
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+
+    it('should match (SELL) ALL_OR_NOTHING order', (done) => {
+        const orderRequest = getOrderRequest(1, 1, 1500, 1, 'BUD', props.address, 0, props.user1.address);
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, 0);
+                assert.equal(+order.originalAmount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 1);
+                if (toMatchKey !== undefined) {
+                    getOrder(toMatchKey, (order) => {
+                        testOrder(order);
+                        assert.equal(+order.amount, 0);
+                        assert.equal(+order.originalAmount, orderRequest.amount);
+                        assert.equal(+order.price, orderRequest.price);
+                        assert.equal(+order.status, 1);
+                    });
+                }
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+
+    it.skip('should cancel all pending orders', (done) => {
+        AssetManagerContract.methods.getOrderKeys("PENDING_ORDERS").call({ from: props.address }).then(result => {
+            for(res of result) {
+                AssetManagerContract.methods.cancelOrder(res).send({ from: props.address }).then(() => {
+                    console.log(`Order ${res} cancelled`);                    
                 });
-            })
+            }
+            done();
+        });
+    }).timeout(TIMEOUT);
+});
+
+describe.skip('AssetManager Partial Fufil Orders Test', () => {
+    before(function (done) {
+        this.timeout(TIMEOUT);
+        unlockAccounts(done);
+    });
+    
+    it('should cancel all pending orders', (done) => {        
+        AssetManagerContract.methods.getOrderKeys("PENDING_ORDERS").call({ from: props.address }).then(result => {
+            for(res of result) {
+                AssetManagerContract.methods.cancelOrder(res).send({ from: props.address }).then(() => {
+                    console.log(`Order ${res} cancelled`);                    
+                });                
+            }
+            done();
         });
     }).timeout(TIMEOUT);
 
     it('should post (BUY) an order', (done) => {
-        const orderRequest = {
-            orderType: 0,
-            orderStrategy: 0,
-            amount: 1500,
-            price: 1,
-            assetName: 'BUD',
-            assetIssuer: props.address,
-        }
-        
-        const value = 1500;
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
-                console.log("Order Posted");
-                getOrders((orders) => {
-                    let order = orders[orders.length - 1];
-                    testOrder(order);
-                    assert.equal(+order.amount, 1500, "order amount should be 1500");
-                    assert.equal(+order.price, 1, "order price should be 1");
-                    done();
-                })
+        const orderRequest = getOrderRequest(0, 0, 1000, 1, 'BUD', props.address, 0, props.address);
+        const value = 1000;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                toMatchKey = order.key;
+                done();
             });
-        });        
+        });
     }).timeout(TIMEOUT);
+
+    it('should partially match (SELL) previous order', (done) => {
+        const orderRequest = getOrderRequest(1, 0, 300, 1, 'BUD', props.address, 0, props.user1.address);
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, 0);
+                assert.equal(+order.originalAmount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 1);    
+                if (toMatchKey !== undefined) {
+                    getOrder(toMatchKey, (order) => {
+                        testOrder(order);
+                        assert.equal(+order.amount, 700);
+                        assert.equal(+order.originalAmount, 1000);
+                        assert.equal(+order.price, orderRequest.price);        
+                        assert.equal(+order.status, 0);    
+                    });
+                }
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);    
 
     it('should match (SELL) previous order', (done) => {
-        const orderRequest = {
-            orderType: 1,
-            orderStrategy: 0,
-            amount: 1500,
-            price: 1,
-            assetName: 'BUD',
-            assetIssuer: props.address,
-        }
-        
-        const value = 1500;
-        web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
-                console.log("Order Posted");
-                getOrders((orders) => {
-                    expect(orders).to.be.an("array");
-                    done();
-                });
-            });
-        });        
-    }).timeout(TIMEOUT);    
-
-    it('should post (BUY) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = {
-            orderType: 0,
-            orderStrategy: 1, // ALL OR NOTHING
-            amount: 1500,
-            price: 1,
-            assetName: 'BUD',
-            assetIssuer: props.address,
-        }
-        
-        const value = 1500;
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
-                console.log("Order Posted");
-                getOrders((orders) => {
-                    let order = orders[orders.length - 1];
-                    testOrder(order);
-                    assert.equal(+order.amount, 1500, "order amount should be 1500");
-                    assert.equal(+order.price, 1, "order price should be 1");
-                    done();
-                })
-            });
-        });        
-    }).timeout(TIMEOUT);
-
-    it('should match (SELL) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = {
-            orderType: 1,
-            orderStrategy: 1, // ALL OR NOTHING, SHOULD MATCH
-            amount: 1500,
-            price: 1,
-            assetName: 'BUD',
-            assetIssuer: props.address,
-        }
-        
-        const value = 1500;
-        web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
-                console.log("Order Posted");
-                getOrders((orders) => {
-                    expect(orders).to.be.an("array");
-                    done();
-                });
-            });
-        });        
-    }).timeout(TIMEOUT);  
-    
-    it('should post (BUY) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = {
-            orderType: 0,
-            orderStrategy: 1, // ALL OR NOTHING
-            amount: 1500,
-            price: 1,
-            assetName: 'BUD',
-            assetIssuer: props.address,
-        }
-        
-        const value = 1500;
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
-                console.log("Order Posted");
-                getOrders((orders) => {
-                    let order = orders[orders.length - 1];
-                    testOrder(order);
-                    assert.equal(+order.amount, 1500, "order amount should be 1500");
-                    assert.equal(+order.price, 1, "order price should be 1");
-                    done();
-                })
-            });
-        });        
-    }).timeout(TIMEOUT);  
-    
-    it('should NOT match (SELL) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = {
-            orderType: 1,
-            orderStrategy: 1, // ALL OR NOTHING, SHOULD MATCH
-            amount: 1700,
-            price: 1,
-            assetName: 'BUD',
-            assetIssuer: props.address,
-        }
-        
-        web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
-                console.log("Order Posted");
-                getOrders((orders) => {
-                    let order = orders[orders.length - 1];
-                    testOrder(order);
-                    cancelOrderId = order.id;
-                    assert.equal(+order.amount, 1700, "order amount should be 0, it would not have been matched");
-                    assert.equal(+order.originalAmount, 1700, "order original amount should still be 1500");
-                    assert.equal(+order.price, 1, "order price should be 1");
-                    assert.isFalse(order.matched, "order should NOT be matched");
-                    done();
-                })
-            });
-        });        
-    }).timeout(TIMEOUT);     
-    
-    it('should match (SELL) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = {
-            orderType: 1,
-            orderStrategy: 1, // ALL OR NOTHING, SHOULD MATCH
-            amount: 1500,
-            price: 1,
-            assetName: 'BUD',
-            assetIssuer: props.address,
-        }
-        
-        const value = 1500;
-        web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
-                console.log("Order Posted");                
-                getOrders((orders) => {
-                    expect(orders).to.be.an("array");
-                    done();
-                })
-            });
-        });        
-    }).timeout(TIMEOUT);  
-    
-    it('should cancel an order', (done) => {
-        console.log("Cancel Order ID: " + cancelOrderId);
-        web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
-            AssetManagerContract.methods.cancelOrder(cancelOrderId).send({ from: props.user1.address }).then(() => {
-                console.log('Order Cancelled');
-                AssetManagerContract.methods.getTokenBalance().call({ from: props.user1.address }).then(result => {
-                    console.log('Balance: ' + result);
-                    assert.isTrue(+result >= 20500, "After cancellation, we should have 20500");
-                });
+        const orderRequest = getOrderRequest(1, 0, 700, 1, 'BUD', props.address, 0, props.user1.address);
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, 0);
+                assert.equal(+order.originalAmount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 1);    
+                if (toMatchKey !== undefined) {
+                    getOrder(toMatchKey, (order) => {
+                        testOrder(order);
+                        assert.equal(+order.amount, 0);
+                        assert.equal(+order.originalAmount, 1000);
+                        assert.equal(+order.price, orderRequest.price);        
+                        assert.equal(+order.status, 1);    
+                    });
+                }
                 done();
             });
         });
-    }).timeout(TIMEOUT);
-    
-    it('should get buy orders', (done) => {
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            getFilteredOrders('BUY', (orders) => {
-                expect(orders).to.be.an("array").with.length.above(0);
-                done();
-            });
-        });
-    }).timeout(TIMEOUT);
-    it('should get sell orders', (done) => {
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            getFilteredOrders('SELL', (orders) => {
-                expect(orders).to.be.an("array").with.length.above(0);
-                done();
-            });
-        });
-    }).timeout(TIMEOUT);
-    it('should get matched orders', (done) => {
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            getFilteredOrders('MATCHED', (orders) => {
-                expect(orders).to.be.an("array").with.length.above(0);
-                done();
-            });
-        });
-    }).timeout(TIMEOUT);
-    it('should get user orders', (done) => {
-        web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-            getFilteredOrders(props.address, (orders) => {
-                expect(orders).to.be.an("array").with.length.above(0);
-                done();
-            });
-        });
-    }).timeout(TIMEOUT);    
+    }).timeout(TIMEOUT);        
 });

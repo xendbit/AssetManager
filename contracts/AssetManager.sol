@@ -5,36 +5,20 @@ pragma experimental ABIEncoderV2;
 import { OrderModel } from './library/OrderModel.sol';
 import { AssetModel } from './library/AssetModel.sol';
 import { Math } from './library/Math.sol';
+import { Constants } from './library/Constants.sol';
+import { IAssetManager } from './library/IAssetManager.sol';
 
-contract AssetManager {        
-    event AssetCreated(AssetModel.Asset asset);
-    event AssetAlreadyExists(AssetModel.AssetRequest asset);
-    event OrderPosted(OrderModel.Order order);
-    event OrderBought(OrderModel.Order order);    
-    event OrderSold(OrderModel.Order order);
-    event DEBUG(string str);
-    event DEBUG(uint256 str);
-    event DEBUG(address str);
-    event DEBUG(bool str);
-    event DEBUG(OrderModel.Order order);
-
-    uint256 ONE_WEI = 1000000000000000000;
-
+contract AssetManager is IAssetManager {    
     // Store All Assets. Key is AssetModel.Asset Id
-    mapping (uint256 => AssetModel.Asset) public assets;
+    mapping (uint256 => AssetModel.Asset) assets;
     uint256 lastAssetId;
 
-    // Store All Orders. Key is OrderModel.Order ID
-    mapping (uint256 => OrderModel.Order) public orders;
-    uint256 lastOrderId;
-    
-    bytes32 constant PENDING_ORDERS_KEY = keccak256(bytes('PENDING_ORDERS'));
-    bytes32 constant  BUY_ORDERS_KEY = keccak256(bytes('BUY_ORDERS'));
-    bytes32 constant  SELL_ORDERS_KEY = keccak256(bytes('SELL_ORDERS'));
-    bytes32 constant  MATCHED_ORDERS_KEY = keccak256(bytes('MATCHED_ORDERS'));    
+    // Store All Orders. Key is OrderModel.Order Key
+    mapping (bytes32 => OrderModel.Order) orders;
+       
     // Store All Orders. Key is hash of keys
-    mapping (bytes32 => uint256[]) public filteredOrders;
-    mapping (address => uint256[]) public userOrders;
+    mapping (bytes32 => OrderModel.SortedKey[]) filtered;
+    mapping (address => OrderModel.SortedKey[]) userOrders;
 
     // store NGNC, key is address (ngnc is in wei)
     mapping(address => uint256) ngnc;
@@ -43,38 +27,30 @@ contract AssetManager {
     
     constructor() {
         lastAssetId = 0;
-
-        ngnc[msg.sender] = 2**250;
-        
-        lastOrderId = 0;
+        ngnc[msg.sender] = 10000000000;
     }
 
-    // TODO: Test this method
-    function transferToken(address toAddress, uint256 amount) public {
-        uint256 senderAmount = ngnc[msg.sender];
-        senderAmount = Math.sub(senderAmount, amount);
-        uint256 recieverAmount = ngnc[toAddress];
-        recieverAmount = Math.add(recieverAmount, amount);    
-        ngnc[msg.sender] = senderAmount;
-        ngnc[toAddress] = recieverAmount;
+    function transferToken(address toAddress, uint256 amount) external {
+        ngnc[msg.sender] = Math.sub(ngnc[msg.sender], amount);
+        ngnc[toAddress] = Math.add(ngnc[toAddress], amount);    
     }
 
-    function getTokenBalance() public view returns (uint256){
+    function getTokenBalance() external view returns (uint256){
         return ngnc[msg.sender];
     }
 
-    function getEscrowBalance() public view returns (uint256){
+    function getEscrowBalance() external view returns (uint256){
         return escrow[msg.sender];
     }
 
-    function transferAsset(address toAddress, string memory assetName, uint256 amount) public {
+    function transferAsset(address toAddress, string memory assetName, uint256 amount) external {
         AssetModel.Asset memory senderAsset = _getAssetByNameAndOwner(assetName, msg.sender);
         AssetModel.Asset memory assetToTransfer = _getAssetByNameAndOwner(assetName, toAddress);
 
         if(senderAsset.quantity >= amount) {            
             if(senderAsset.owner == msg.sender && senderAsset.quantity > amount) {                
                 if(assetToTransfer.owner == address(0)) {
-                    // create an asset for the user
+                    
                     senderAsset.quantity = Math.sub(senderAsset.quantity, amount);
                     assets[senderAsset.id] = senderAsset;
                     assetToTransfer = AssetModel.Asset({
@@ -96,32 +72,31 @@ contract AssetManager {
                     assets[senderAsset.id] = senderAsset;
                 }            
             } else {
-                emit DEBUG("AssetModel.Asset not found or you don't have enough to transfer");
+                emit DEBUG("Asset not found");
                 return;
             }
         } else {
-            emit DEBUG("Sender doesn't have enough assets to transfer");
+            emit DEBUG("Asset Not Enough");
             return;
         }
     }
     
-    function createAsset(AssetModel.AssetRequest memory assetRequest) public {
-        AssetModel.validateAsset(assetRequest);  
-        AssetModel.Asset memory existing = _getAssetByName(assetRequest.name);
+    function createAsset(AssetModel.AssetRequest memory ar) external {
+        AssetModel.validateAsset(ar);  
+        AssetModel.Asset memory existing = _getAssetByNameAndIssuer(ar.name, msg.sender);
         if(existing.issuer != address(0) && existing.owner == msg.sender) {
-            emit AssetAlreadyExists(assetRequest);
-            emit DEBUG("AssetModel.Asset with name already exists for sender");
+            emit AssetAlreadyExists(ar);
+            emit DEBUG("Asset exists");
             return;
         } else {
             uint256 lai = lastAssetId;
-            uint256 totalQuantity = assetRequest.totalQuantity;
             AssetModel.Asset memory asset = AssetModel.Asset({
                 id: lai,
-                name: assetRequest.name,
-                description: assetRequest.description,
-                totalQuantity: totalQuantity,
-                quantity: totalQuantity,
-                decimal: assetRequest.decimal,
+                name: ar.name,
+                description: ar.description,
+                totalQuantity: ar.totalQuantity,
+                quantity: ar.totalQuantity,
+                decimal: ar.decimal,
                 issuer: msg.sender,
                 owner: msg.sender
             });
@@ -130,46 +105,43 @@ contract AssetManager {
 
             emit AssetCreated(asset);
         }
-    } 
+    }
 
-    function postOrder(OrderModel.OrderRequest memory orderRequest) public payable {
-        OrderModel.validateOrder(orderRequest);
+    function postOrder(OrderModel.OrderRequest memory or) external payable {
+        OrderModel.validateOrder(or);
 
-        AssetModel.Asset memory asset = _getAssetByNameAndIssuer(orderRequest.assetName, orderRequest.assetIssuer);
+        AssetModel.Asset memory asset = _getAssetByNameAndIssuer(or.assetName, or.assetIssuer);
 
         if(asset.issuer == address(0)) {
-            emit DEBUG('Requested asset does not exist');
+            emit DEBUG('Asset does not exist');
             return;
         } else {
             address seller;
             address buyer;
-            uint256 loi = lastOrderId;
-            if(orderRequest.orderType == OrderModel.OrderType.BUY) {
-                //does the buyer send enough ether to cover the transaction
-                uint256 value = msg.value;
-                uint256 totalCost = Math.mul(orderRequest.amount, orderRequest.price);
+            if(or.orderType == OrderModel.OrderType.BUY) {
+                uint256 totalCost = Math.mul(or.amount, or.price);
                 
                 uint256 buyerNgncBalance = ngnc[msg.sender];
 
-                uint256 totalNgncValue = Math.add(buyerNgncBalance, value);
+                uint256 totalNgncValue = Math.add(buyerNgncBalance, msg.value);
 
                 if(totalNgncValue >= totalCost) {
                     ngnc[msg.sender] = totalNgncValue;
                     ngnc[msg.sender] = Math.sub(ngnc[msg.sender], totalCost);
                     escrow[msg.sender] = Math.add(escrow[msg.sender], totalCost);
                 } else {
-                    emit DEBUG("Ether sent is not enough to cover the costs of the BUY request");
+                    emit DEBUG("Not Enough Ether");
                     return;
                 }
 
                 buyer = msg.sender;
                 seller = address(0);    
-                // if this buyer doesn't have this asset, create one for them
-                AssetModel.Asset memory buyerAsset = _getAssetByNameAndOwner(orderRequest.assetName, msg.sender);                
+                
+                AssetModel.Asset memory buyerAsset = _getAssetByNameAndOwner(or.assetName, msg.sender);                
                 if(buyerAsset.owner == address(0)) {                
                     buyerAsset = AssetModel.Asset({
                         id: lastAssetId,
-                        name: orderRequest.assetName,
+                        name: or.assetName,
                         description: asset.description,
                         totalQuantity: asset.totalQuantity,
                         quantity: 0,
@@ -183,342 +155,279 @@ contract AssetManager {
                     emit AssetCreated(buyerAsset);
                 }
 
-            } else if(orderRequest.orderType == OrderModel.OrderType.SELL) {
+            } else if(or.orderType == OrderModel.OrderType.SELL) {
                 buyer =  address(0);            
                 seller = msg.sender;            
                 //check that you have the asset you want to sell
-                AssetModel.Asset memory sellerAsset = _getAssetByNameAndOwner(orderRequest.assetName, msg.sender);
-                if(sellerAsset.quantity < orderRequest.amount) {
-                    emit DEBUG('You do not have enough of the asset to cover the sale');
+                AssetModel.Asset memory sellerAsset = _getAssetByNameAndOwner(or.assetName, msg.sender);
+                if(sellerAsset.quantity < or.amount) {
+                    emit DEBUG('Not Enough Asset');
                     return;
                 }            
             }
 
-            OrderModel.Order memory dbOrder = OrderModel.Order({
-                id: loi,
-                index: 0,
-                orderType: orderRequest.orderType,
-                orderStrategy: orderRequest.orderStrategy,
-                seller: seller,
-                buyer: buyer,
-                assetName: orderRequest.assetName,
-                amount: orderRequest.amount,
-                originalAmount: orderRequest.amount,
-                price: orderRequest.price,
-                matched: false,
-                orderDate: block.timestamp,
-                matchedDate: 0
+            OrderModel.SortedKey memory sortedKey = OrderModel.SortedKey({
+                key: or.key,
+                date: block.timestamp
             });
 
-            orders[loi] = dbOrder;
-            lastOrderId = Math.add(1, lastOrderId);
-            
-            OrderModel.Order memory matchingOrder = dbOrder;
-            _populateFilteredOrders(matchingOrder);
-            
-            // try and match the matchingOrder with previously posted orders                    
-            emit OrderPosted(matchingOrder);
-            _matchOrder(matchingOrder);
+            OrderModel.Order memory dbOrder = OrderModel.Order({
+                key: sortedKey,
+                orderType: or.orderType,
+                orderStrategy: or.orderStrategy,
+                seller: seller,
+                buyer: buyer,
+                assetName: or.assetName,
+                amount: or.amount,
+                originalAmount: or.amount,
+                price: or.price,
+                status: OrderModel.OrderStatus.NEW,
+                orderDate: block.timestamp,
+                statusDate: block.timestamp,
+                goodUntil: or.goodUntil
+            });
+
+            orders[or.key] = dbOrder;
+                        
+            _populateFilteredOrders(dbOrder.key, dbOrder.orderType, dbOrder.buyer, dbOrder.seller);
+                       
+            emit OrderPosted(dbOrder);
+            _matchOrder(dbOrder);
         }
     }
 
-    function cancelOrder(uint256 orderId) public {
-        OrderModel.Order memory exists = orders[orderId];
-        uint256 price = exists.price;
-        uint256 amount = exists.amount;
-        uint256 totalCost = Math.mul(amount, price);
+    function cancelOrder(bytes32 key) external {
+        _deleteElement(orders[key].key);
+    }
 
-        if(exists.orderDate > 0 && (exists.buyer != address(0) || exists.seller != address(0)) && exists.matched == false) {
-            uint256 index = exists.index;
-            uint256 lastIndex = filteredOrders[PENDING_ORDERS_KEY].length - 1;
+    function getOrder(bytes32 key) external view returns (OrderModel.Order memory) {        
+        return orders[key];
+    }
 
-            if(index == lastIndex && index == 0) {
-                filteredOrders[PENDING_ORDERS_KEY].pop();
-            } else if(lastIndex >= 0) {
-                // copy last element into index;
-                filteredOrders[PENDING_ORDERS_KEY][index] = filteredOrders[PENDING_ORDERS_KEY][lastIndex];
-                // update last element index
-                orders[filteredOrders[PENDING_ORDERS_KEY][lastIndex]].index = index;
-                // delete last element
-                filteredOrders[PENDING_ORDERS_KEY].pop();
-            }
+    function getOrders(string memory key) external view returns (OrderModel.Order[] memory) {        
+        OrderModel.SortedKey[] memory orderKeys = filtered[keccak256(bytes(key))];
 
-            // refund if buy order
-            if(exists.orderType == OrderModel.OrderType.BUY) {
-                ngnc[msg.sender] = Math.add(ngnc[msg.sender], totalCost);
-                escrow[msg.sender] = Math.sub(escrow[msg.sender], totalCost);                    
-            }            
+        OrderModel.Order[] memory allOrders = new OrderModel.Order[](orderKeys.length);
+        for(uint256 i = 0; i < orderKeys.length; i++) { 
+            allOrders[i] = orders[orderKeys[i].key];
         }
+        return allOrders;
     }
 
-    function getOrders() public view returns (OrderModel.Order[] memory) {        
-        return _getFilteredOrders(PENDING_ORDERS_KEY);
-    }
-
-    function getBuyOrders() public view returns (OrderModel.Order[] memory) {        
-        return _getFilteredOrders(BUY_ORDERS_KEY);
-    }
-
-    function getSellOrders() public view returns (OrderModel.Order[] memory) {        
-        return _getFilteredOrders(SELL_ORDERS_KEY);
-    }
-
-    function getMatchedOrders() public view returns (OrderModel.Order[] memory) {        
-        return _getFilteredOrders(MATCHED_ORDERS_KEY);
-    }    
-
-    function getUserOrders(address user) public view returns (OrderModel.Order[] memory) {
+    function getUserOrders(address user) external view returns (OrderModel.Order[] memory) {
         uint256 size = userOrders[user].length;
 
         OrderModel.Order[] memory allOrders = new OrderModel.Order[](size);
-        for(uint256 i = 0; i < size; i = Math.add(1, i)) {    
-            uint256 index = userOrders[user][i];
-            allOrders[i] = orders[index];
+        for(uint256 i = 0; i < size; i++) {    
+            bytes32 key = userOrders[user][i].key;
+            allOrders[i] = orders[key];
         }
 
         return allOrders;
     } 
 
-    function getAssets() public view returns (AssetModel.Asset[] memory) {        
+    function getAssets() external view returns (AssetModel.Asset[] memory) {        
         AssetModel.Asset[] memory allAssets = new AssetModel.Asset[](lastAssetId);
-        for(uint256 i = 0; i < lastAssetId; i = Math.add(1, i)) {
+        for(uint256 i = 0; i < lastAssetId; i++) {
             allAssets[i] = assets[i];
         }
         
         return allAssets;
     } 
     
-    function getUserAssets(address user) public view returns (AssetModel.Asset[] memory) {
+    function getUserAssets(address user) external view returns (AssetModel.Asset[] memory) {
         AssetModel.Asset[] memory allAssets = new AssetModel.Asset[](lastAssetId);
-        for(uint256 i = 0; i < lastAssetId; i = Math.add(1, i)) {
+        for(uint256 i = 0; i < lastAssetId; i++) {
             if(assets[i].owner == user) {
                 allAssets[i] = assets[i];
             }
         }
         
         return allAssets;
-    }     
+    } 
 
-    function getIssuedAssets(address user) public view returns (AssetModel.Asset[] memory) {
-        AssetModel.Asset[] memory allAssets = new AssetModel.Asset[](lastAssetId);
-        for(uint256 i = 0; i < lastAssetId; i = Math.add(1, i)) {
-            if(assets[i].issuer == user) {
-                allAssets[i] = assets[i];
-            }
-        }
-        
-        return allAssets;
-    }  
-
-    function _matchOrder(OrderModel.Order memory matchingOrder) private {        
-        uint256 k = 0;        
+    function _matchOrder(OrderModel.Order memory matchingOrder) private {                
         bool matched = false;
-        uint256 toBuy = 0;
-        uint256 toSell = 0;
-        //AssetModel.Asset memory asset = assets[matchingOrder.assetId];    
-        uint256 pendingOrdersSize = filteredOrders[PENDING_ORDERS_KEY].length;
-        while(k < pendingOrdersSize && matched == false) {
-            // check to make sure k is still less than pendingOrdersSize
-            pendingOrdersSize = filteredOrders[PENDING_ORDERS_KEY].length;
-            if(k >= pendingOrdersSize) {
-                break;
-            }
+        uint256 pendingOrdersSize = filtered[Constants.PENDING_ORDERS_KEY].length;
+        if(pendingOrdersSize == 1) {
+            return;            
+        }
 
-            uint256 index = filteredOrders[PENDING_ORDERS_KEY][k];
-            OrderModel.Order memory toMatch = orders[index];
-            bool assetNameEquals = keccak256(bytes(matchingOrder.assetName)) == keccak256(bytes(toMatch.assetName));
-            bool sameType = toMatch.orderType == matchingOrder.orderType;
-            bool buyerIsSeller = false;
-            if(toMatch.seller != address(0) && matchingOrder.buyer != address(0)) {
-                buyerIsSeller = toMatch.seller == matchingOrder.buyer;
-            } else if (toMatch.buyer != address(0) && matchingOrder.seller != address(0)) {
-                buyerIsSeller = toMatch.buyer == matchingOrder.seller;
-            }
+        uint256 k = Math.sub(pendingOrdersSize, 1);
+        uint256 end = pendingOrdersSize > Constants.MAX_ORDERS_TO_PROCESS ? Constants.MAX_ORDERS_TO_PROCESS : 0;        
 
-            bool shouldProcess = assetNameEquals && !toMatch.matched && !sameType && !buyerIsSeller;
+        while(k >= end && matched == false) {
+            if(filtered[Constants.PENDING_ORDERS_KEY][k].date != 0) {            
+                OrderModel.Order memory toMatch = orders[filtered[Constants.PENDING_ORDERS_KEY][k].key];
+                bool assetNameEquals = keccak256(bytes(matchingOrder.assetName)) == keccak256(bytes(toMatch.assetName));
+                bool sameType = toMatch.orderType == matchingOrder.orderType;
+                bool buyerIsSeller = false;
+                if(toMatch.seller != address(0) && matchingOrder.buyer != address(0)) {
+                    buyerIsSeller = toMatch.seller == matchingOrder.buyer;
+                } else if (toMatch.buyer != address(0) && matchingOrder.seller != address(0)) {
+                    buyerIsSeller = toMatch.buyer == matchingOrder.seller;
+                }
 
-            if(shouldProcess) {               
+                bool shouldProcess = assetNameEquals && toMatch.status == OrderModel.OrderStatus.NEW && !sameType && !buyerIsSeller;
 
-                if(matchingOrder.orderType == OrderModel.OrderType.BUY) {
-                    
-                    //copy matchingOrder into buyOrder
-                    OrderModel.Order memory buyOrder = matchingOrder;
+                if(shouldProcess) {
+                    OrderModel.Order memory buyOrder;
+                    OrderModel.Order memory sellOrder;
+                    Constants.Values memory returnValues;
+                    if(matchingOrder.orderType == OrderModel.OrderType.BUY) {                    
+                        buyOrder = matchingOrder;
+                        sellOrder = toMatch;
+                        returnValues = _processOrder(buyOrder, sellOrder);
+                        matched = returnValues.matched;
+                        matchingOrder = orders[buyOrder.key.key];                     
+                    } else if(matchingOrder.orderType == OrderModel.OrderType.SELL) {                    
+                        //copy matchingOrder into sellOrder
+                        sellOrder = matchingOrder;                                        
+                        buyOrder = toMatch;
+                        returnValues = _processOrder(buyOrder, sellOrder);
+                        matched = returnValues.matched;
+                        matchingOrder = orders[sellOrder.key.key];                    
+                    }  
 
-                    // match buy to sell
-                    // 1. Copy toMatch into sellOrder
-                    // 2. Process the order
-                    // 3. Copy updated buyOrder into matchingOrder
+                    if(buyOrder.status == OrderModel.OrderStatus.MATCHED || sellOrder.status == OrderModel.OrderStatus.MATCHED) {
+                        AssetModel.Asset memory buyerAsset = _getAssetByNameAndOwner(buyOrder.assetName, buyOrder.buyer);
+                        AssetModel.Asset memory sellerAsset = _getAssetByNameAndOwner(sellOrder.assetName, sellOrder.seller);
+                                                
+                        buyerAsset.quantity = Math.add(buyerAsset.quantity, returnValues.toBuy);
+                        assets[buyerAsset.id] = buyerAsset;            
                     
-                    OrderModel.Order memory sellOrder = toMatch;
-                    if(sellOrder.orderType == OrderModel.OrderType.SELL) {
-                        (matched, toBuy, toSell) = _processOrder(buyOrder, sellOrder);
-                        if(matched) {
-                            // transfer money from escrow of buyer to seller
-                            uint256 totalCost = Math.mul(toBuy, buyOrder.price);
-                            uint256 sellerBalance = ngnc[sellOrder.seller];
-                            uint256 buyerBalance = escrow[buyOrder.buyer];
-                            ngnc[sellOrder.seller] = Math.add(sellerBalance, totalCost);
-                            escrow[buyOrder.buyer] = Math.sub(buyerBalance, totalCost);                    
-                        }                        
-                        matchingOrder = orders[buyOrder.id];
-                    }                    
-                } else if(matchingOrder.orderType == OrderModel.OrderType.SELL) {
-                    
-                    //copy matchingOrder into sellOrder
-                    OrderModel.Order memory sellOrder = matchingOrder;
-                    
-                    // match sell to buy
-                    // 1. Copy toMatch into buyOrder
-                    // 2. Process the order
-                    // 3. Copy updated sellOrder into matchingOrder
-                    
-                    OrderModel.Order memory buyOrder = toMatch;
-                    if(buyOrder.orderType == OrderModel.OrderType.BUY) {
-                        (matched, toBuy, toSell) = _processOrder(buyOrder, sellOrder);
-                        if(matched) {
-                            // transfer money from escrow of buyer to seller
-                            uint256 totalCost = Math.mul(toBuy, buyOrder.price);
-                            uint256 sellerBalance = ngnc[sellOrder.seller];
-                            uint256 buyerBalance = escrow[buyOrder.buyer];
-                            ngnc[sellOrder.seller] = Math.add(sellerBalance, totalCost);
-                            escrow[buyOrder.buyer] = Math.sub(buyerBalance, totalCost);                    
-                        }                        
-                        matchingOrder = orders[sellOrder.id];
+                        sellerAsset.quantity = Math.sub(sellerAsset.quantity, returnValues.toSell);
+                        assets[sellerAsset.id] = sellerAsset;                  
+
+                        uint256 totalCost = Math.mul(returnValues.toBuy, buyOrder.price);
+                        uint256 toSeller = Math.mul(returnValues.toSell, sellOrder.price);
+                        ngnc[sellOrder.seller] = Math.add(ngnc[sellOrder.seller], toSeller);
+                        escrow[buyOrder.buyer] = Math.sub(escrow[buyOrder.buyer], toSeller);    
+                        // in case the buyer pays less than the price he set, return the balance to buyer                
+                        ngnc[buyOrder.buyer] = Math.add(ngnc[buyOrder.buyer], Math.sub(totalCost, toSeller));
                     }
-                }                
+                } 
+            }
+            if(k == 0) {
+                break;
             } else {
-                //it's either not the same asset id or the matchingOrder has been previously fully matched
+                k = Math.sub(k, 1);
             }
-            k = Math.add(1, k);
         }
     }
 
-    function _processOrder(OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private returns (bool matched, uint256 toBuy, uint256 toSell) {
-        matched = false;
-        if(buyOrder.price >= sellOrder.price) {
-            // check if seller can fufill all the transaction or part of the transaction
-            uint256 buyerAmount = buyOrder.amount;
-            uint256 sellerAmount = sellOrder.amount;
+    function _processOrder(OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private returns (Constants.Values memory returnValues) {
+        returnValues = Constants.Values({
+            matched: false,
+            buyExpired: false,
+            sellExpired: false,
+            toBuy: 0,
+            toSell: 0
+        });
 
-            // uint256 toBuy;
-            // uint256 toSell;  
-            AssetModel.Asset memory buyerAsset = _getAssetByNameAndOwner(buyOrder.assetName, buyOrder.buyer);
-            AssetModel.Asset memory sellerAsset = _getAssetByNameAndOwner(sellOrder.assetName, sellOrder.seller);
-                        
+        uint256 buyerAmount = buyOrder.amount;
+        uint256 sellerAmount = sellOrder.amount;
+
+                    
+        if(buyOrder.goodUntil > 0 && buyOrder.goodUntil < block.timestamp) {
+            returnValues.buyExpired = true;
+        }
+        if(sellOrder.goodUntil > 0 && sellOrder.goodUntil < block.timestamp) {
+            returnValues.sellExpired = true;
+        }        
+
+        if(buyOrder.price >= sellOrder.price && (returnValues.buyExpired == false && returnValues.sellExpired == false)) {
             if(buyerAmount == sellerAmount) {
-                // Either the strategy is all or nothing or it is partial, run this code
-                toBuy = buyerAmount;
-                toSell = sellerAmount;
-                buyOrder.matched = true;
-                sellOrder.matched = true;
-                matched = true;
-                sellOrder.amount = 0;
-                buyOrder.amount = 0;
-                _filterMatchedOrder(buyOrder);
-                _filterMatchedOrder(sellOrder);
-                emit OrderBought(buyOrder);
-                emit OrderSold(sellOrder);
-            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy == OrderModel.OrderStrategy.PARTIAL) {
-                toBuy = sellerAmount;
-                toSell = sellerAmount;
-                sellOrder.matched = true;
-                buyOrder.amount = Math.sub(buyerAmount, sellerAmount);
-                sellOrder.amount = 0;
-                _filterMatchedOrder(sellOrder);
-                emit OrderSold(sellOrder);
-            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy == OrderModel.OrderStrategy.PARTIAL) {
-                toBuy = buyerAmount;
-                toSell = buyerAmount;
-                buyOrder.matched = true;
-                sellOrder.amount = Math.sub(sellerAmount, buyerAmount);
-                buyOrder.amount = 0;
-                _filterMatchedOrder(buyOrder);
-                emit OrderBought(buyOrder);                
+                _processOrderSameAmount(returnValues, buyOrder, sellOrder);
+            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy != OrderModel.OrderStrategy.AON) {
+                _processOrderBuyPartial(returnValues, buyOrder, sellOrder);
+            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy != OrderModel.OrderStrategy.AON) {
+                _processOrderSellPartial(returnValues, buyOrder, sellOrder);
+            }            
+        } else if(sellOrder.orderStrategy == OrderModel.OrderStrategy.MO && returnValues.sellExpired == false) {
+            if(buyerAmount == sellerAmount) {
+                _processOrderSameAmount(returnValues, buyOrder, sellOrder);
+            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy != OrderModel.OrderStrategy.AON) {
+                _processOrderBuyPartial(returnValues, buyOrder, sellOrder);
+            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy != OrderModel.OrderStrategy.AON) {
+                _processOrderSellPartial(returnValues, buyOrder, sellOrder);
             }
-            
-            if(buyOrder.matched == true || sellOrder.matched == true) {
-                // transfer toBuy to buyer                            
-                uint256 newBuyerAssetQuantity = Math.add(buyerAsset.quantity, toBuy);
-                buyerAsset.quantity = newBuyerAssetQuantity;
-                uint256 buyerId = buyerAsset.id;                            
-                assets[buyerId] = buyerAsset;            
-
-                // remove toSell from seller                            
-                uint256 newSellerAssetQuantity = Math.sub(sellerAsset.quantity, toSell);
-                sellerAsset.quantity = newSellerAssetQuantity;
-                uint256 sellerId = sellerAsset.id;
-                assets[sellerId] = sellerAsset;
-            }
-        } else {
-            //if the price is not witing range.
         }
-        // update the orders
-        orders[sellOrder.id] = sellOrder;
-        orders[buyOrder.id] = buyOrder;        
+ 
+        orders[sellOrder.key.key] = sellOrder;
+        orders[buyOrder.key.key] = buyOrder;        
     }
 
-    function _populateFilteredOrders(OrderModel.Order memory order) private {
-        filteredOrders[PENDING_ORDERS_KEY].push(order.id);
+    function _processOrderSameAmount(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private {
+        returnValues.toBuy = buyOrder.amount;
+        returnValues.toSell = sellOrder.amount;
+        returnValues.matched = true;
+        sellOrder.amount = 0;
+        buyOrder.amount = 0;
+        _filterMatchedOrder(buyOrder);
+        _filterMatchedOrder(sellOrder);
+        emit OrderBought(buyOrder);
+        emit OrderSold(sellOrder);        
+    }
 
-        // update order.index
-        uint256 size = filteredOrders[PENDING_ORDERS_KEY].length;
-        orders[order.id].index = size - 1;
+    function _processOrderBuyPartial(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private {
+        returnValues.toBuy = sellOrder.amount;
+        returnValues.toSell = sellOrder.amount;
+        buyOrder.amount = Math.sub(buyOrder.amount, sellOrder.amount);
+        sellOrder.amount = 0;
+        _filterMatchedOrder(sellOrder);
+        emit OrderSold(sellOrder);
+    }
 
-        if(order.orderType == OrderModel.OrderType.BUY) {
-            filteredOrders[BUY_ORDERS_KEY].push(order.id);
-            userOrders[order.buyer].push(order.id);
+    function _processOrderSellPartial(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private {
+        returnValues.toBuy = buyOrder.amount;
+        returnValues.toSell = buyOrder.amount;
+        sellOrder.amount = Math.sub(sellOrder.amount, buyOrder.amount);
+        buyOrder.amount = 0;
+        _filterMatchedOrder(buyOrder);
+        emit OrderBought(buyOrder);                        
+    }
+
+    function _populateFilteredOrders(OrderModel.SortedKey memory key, OrderModel.OrderType orderType, address buyer, address seller) private {
+        filtered[Constants.PENDING_ORDERS_KEY].push(key);    
+
+        if(orderType == OrderModel.OrderType.BUY) {
+            filtered[Constants.BUY_ORDERS_KEY].push(key);
+            userOrders[buyer].push(key);
         } else {
-            filteredOrders[SELL_ORDERS_KEY].push(order.id);
-            userOrders[order.seller].push(order.id);
+            filtered[Constants.SELL_ORDERS_KEY].push(key);
+            userOrders[seller].push(key);
         }        
     }
 
     function _filterMatchedOrder(OrderModel.Order memory order) private {
-        filteredOrders[MATCHED_ORDERS_KEY].push(order.id);
-
-        uint256 lastIndex = filteredOrders[PENDING_ORDERS_KEY].length - 1;
-        uint256 index = order.index;
-
-        if(lastIndex < 0) {
-            // there must be at least 1 element (lastIndex >= 0) in PENDING_ORDERS
-            // if there's less than one element something is terribly wrong
-            emit DEBUG("PENDING_ORDERS had less than 1 elements during _filterMatchedOrder, this is a bug that must be checked ASAP");
-        } else {
-            // copy last element into index;
-            filteredOrders[PENDING_ORDERS_KEY][index] = filteredOrders[PENDING_ORDERS_KEY][lastIndex];
-            // update last element index
-            orders[filteredOrders[PENDING_ORDERS_KEY][lastIndex]].index = index;
-            // delete last element
-            filteredOrders[PENDING_ORDERS_KEY].pop();
-        }
+        OrderModel.SortedKey memory key = order.key;  
+        _deleteElement(key);
+        
+        filtered[Constants.MATCHED_ORDERS_KEY].push(order.key);
+        order.status = OrderModel.OrderStatus.MATCHED;
+        order.statusDate = block.timestamp;                
     }
 
-    function _getFilteredOrders(bytes32 key) public view returns (OrderModel.Order[] memory) {        
-        uint256[] memory fo = filteredOrders[key];
-        uint256 size = fo.length;
-        OrderModel.Order[] memory allOrders = new OrderModel.Order[](size);
-        for(uint256 i = 0; i < size; i = Math.add(1, i)) {
-            uint256 index = fo[i];
-            allOrders[i] = orders[index];
+    function _deleteElement(OrderModel.SortedKey memory key) private { 
+        if(filtered[Constants.PENDING_ORDERS_KEY].length == 0) {
+            return;
         }
 
-        return allOrders;
+        if(filtered[Constants.PENDING_ORDERS_KEY].length == 1) {
+            filtered[Constants.PENDING_ORDERS_KEY].pop();
+        }
+
+        uint256 size = Math.sub(filtered[Constants.PENDING_ORDERS_KEY].length, 1);        
+        int256 pos = Constants.binarySearch(filtered[Constants.PENDING_ORDERS_KEY], 0, int256(size), key); 
+        
+        if (pos >= 0) {
+            delete filtered[Constants.PENDING_ORDERS_KEY][uint256(pos)];
+        }
     }    
 
-    function _getAssetByName(string memory name) private view returns (AssetModel.Asset memory) {
-        for(uint256 i = 0; i < lastAssetId; i = Math.add(1, i)) {
-            AssetModel.Asset memory asset = assets[i];
-            string memory assetName = asset.name;
-            if(keccak256((bytes(assetName))) == keccak256(bytes(name))) {
-                return asset;
-            }
-        }
-
-        //return _nullAsset();
-    }
-
     function _getAssetByNameAndOwner(string memory name, address owner) private view returns (AssetModel.Asset memory) {
-        for(uint256 i = 0; i < lastAssetId; i = Math.add(1, i)) {
+        for(uint256 i = 0; i < lastAssetId; i++) {
             AssetModel.Asset memory asset = assets[i];
             string memory assetName = asset.name;
             if(keccak256((bytes(assetName))) == keccak256(bytes(name)) && asset.owner == owner) {
@@ -526,11 +435,11 @@ contract AssetManager {
             }
         }
 
-        //return _nullAsset();
+        return AssetModel.nullAsset();
     }
 
     function _getAssetByNameAndIssuer(string memory name, address issuer) private view returns (AssetModel.Asset memory) {
-        for(uint256 i = 0; i < lastAssetId; i = Math.add(1, i)) {
+        for(uint256 i = 0; i < lastAssetId; i++) {
             AssetModel.Asset memory asset = assets[i];
             string memory assetName = asset.name;
             if(keccak256((bytes(assetName))) == keccak256(bytes(name)) && asset.issuer == issuer) {
@@ -538,21 +447,6 @@ contract AssetManager {
             }
         }
 
-        return _nullAsset();
-    }
-
-    function _nullAsset() private pure returns (AssetModel.Asset memory) {
-        AssetModel.Asset memory asset = AssetModel.Asset({
-            id: 0,
-            name: '',
-            description: '',
-            totalQuantity: 0,
-            quantity: 0,
-            decimal: 0,
-            issuer: address(0),
-            owner: address(0)
-        });
-
-        return asset;
+        return AssetModel.nullAsset();
     }
 }

@@ -59,4 +59,20 @@ library AssetModel {
         require(asset.totalQuantity > 0);
         require(asset.decimal >= 0);
     }
+
+    function nullAsset() public pure returns (AssetModel.Asset memory) {
+        AssetModel.Asset memory asset = AssetModel.Asset({
+            id: 0,
+            name: '',
+            description: '',
+            totalQuantity: 0,
+            quantity: 0,
+            decimal: 0,
+            issuer: address(0),
+            owner: address(0)
+        });
+
+        return asset;
+    }
+
 }
