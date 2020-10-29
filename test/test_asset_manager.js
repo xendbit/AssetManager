@@ -81,7 +81,7 @@ describe('AssetManager Normal Orders Test', () => {
                 assert.equal(+order.amount, orderRequest.amount);
                 assert.equal(+order.price, orderRequest.price);
                 assert.equal(+order.status, 0);
-                toMatchKey = order.key;
+                toMatchKey = order.key.key;
                 done();
             });
         });
@@ -123,7 +123,7 @@ describe('AssetManager ALL OR NOTHING Orders Test', () => {
                 assert.equal(+order.amount, orderRequest.amount);
                 assert.equal(+order.price, orderRequest.price);
                 assert.equal(+order.status, 0);
-                toMatchKey = order.key;
+                toMatchKey = order.key.key;
                 done();
             });
         });
@@ -163,7 +163,7 @@ describe('AssetManager ALL OR NOTHING Orders Test', () => {
                 assert.equal(+order.amount, orderRequest.amount);
                 assert.equal(+order.price, orderRequest.price);
                 assert.equal(+order.status, 0);
-                toMatchKey = order.key;
+                toMatchKey = order.key.key;
                 done();
             });
         });
@@ -245,7 +245,7 @@ describe.skip('AssetManager Partial Fufil Orders Test', () => {
                 testOrder(order);
                 assert.equal(+order.amount, orderRequest.amount);
                 assert.equal(+order.price, orderRequest.price);
-                toMatchKey = order.key;
+                toMatchKey = order.key.key;
                 done();
             });
         });

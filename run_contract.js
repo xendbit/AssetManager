@@ -356,13 +356,6 @@ function getBalances() {
     });
 }
 
-function testBS() {
-    web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
-        AssetManagerContract.methods.testBinarySearch().send({ from: props.user1.address }).then(() => {
-            //console.log(`POS: ${result}`);
-        });
-    });
-}
 async function start() {
     createNewAsset('BUD', 'Budweiser', (hash) => {
         console.log(hash);
@@ -382,45 +375,14 @@ async function start() {
     });
 }
 
-function binarySearch(arr, l, r, x) {
-    console.log(387, arr, l, r);
-    if (r >= l) {
-        mid = Math.floor(l + (r - l) / 2);
-        console.log(387, mid);
-        // If the element is present at the middle 
-        // itself 
-        if (arr[mid] == x) {
-            return mid;
-        }
-
-        // If element is smaller than mid, then 
-        // it can only be present in left subarray 
-        if (arr[mid] > x) {
-            return binarySearch(arr, l, mid - 1, x);
-        }
-
-        // Else the element can only be present 
-        // in right subarray 
-        return binarySearch(arr, mid + 1, r, x);
-    }
-
-    // We reach here when element is not 
-    // present in array 
-    return -1;
-}
-
-//console.log(binarySearch([1,2,3,4,5], 0, 4, 5));
-
-
-//testBS();
 //start();
 // processEvents();
-//postOrder(0, 0, 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
+postOrder(0, 0, 1750, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
 //postOrderWithAddress(props.user1.address, props.user1.password, 1, 0, 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
-// getOrders("PENDING_ORDERS", (allOrders) => { console.log(allOrders); console.log(allOrders.length) });
+//getOrders("PENDING_ORDERS", (allOrders) => { console.log(allOrders); console.log(allOrders.length) });
 //getOrders("BUY_ORDERS", (allOrders) => { console.log(allOrders) });
 // getOrders("SELL_ORDERS", (allOrders) => { console.log(allOrders) });
-getOrders("MATCHED_ORDERS", (allOrders) => { console.log(allOrders) });
+//getOrders("MATCHED_ORDERS", (allOrders) => { console.log(allOrders) });
 //getOrders("DELETED_ORDERS", (allOrders) => { console.log(allOrders) });
 //getUserOrders(props.user1.address, (allOrders) => {console.log(allOrders)});
 

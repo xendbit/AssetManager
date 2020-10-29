@@ -416,13 +416,18 @@ contract AssetManager is IAssetManager {
 
         if(filtered[Constants.PENDING_ORDERS_KEY].length == 1) {
             filtered[Constants.PENDING_ORDERS_KEY].pop();
+            return;
         }
 
         uint256 size = Math.sub(filtered[Constants.PENDING_ORDERS_KEY].length, 1);        
         int256 pos = Constants.binarySearch(filtered[Constants.PENDING_ORDERS_KEY], 0, int256(size), key); 
         
         if (pos >= 0) {
-            delete filtered[Constants.PENDING_ORDERS_KEY][uint256(pos)];
+            for(uint256 i = uint256(pos); i < size; i++) {
+                filtered[Constants.PENDING_ORDERS_KEY][i] = filtered[Constants.PENDING_ORDERS_KEY][i + 1];
+            }
+            //delete filtered[Constants.PENDING_ORDERS_KEY][uint256(pos)];
+            filtered[Constants.PENDING_ORDERS_KEY].pop();
         }
     }    
 

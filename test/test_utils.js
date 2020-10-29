@@ -54,7 +54,6 @@ function testOrder(order) {
     expect(order).to.have.property("amount");
     expect(order).to.have.property("assetName").to.equal('BUD');
     expect(order).to.have.property("price");
-    expect(order).to.have.property("index");
     expect(order).to.have.property("key");
 }
 
