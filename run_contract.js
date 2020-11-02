@@ -9,6 +9,18 @@ const abiPath = props.abiPath;
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
 
+const OrderType = {
+    BUY: 0,
+    SELL: 1,
+}
+const OrderStrategy = {
+    GTC: 0,
+    AON: 1,
+    GTD: 2,
+    GTM: 3,
+    MO: 4,
+}
+
 function importAddress() {
     // main mac - default
     //web3.eth.personal.importRawKey(props.privKey, 'Wq017kmg@tm');
@@ -96,32 +108,6 @@ function getIssuedAssets(address, callback) {
             }
             callback(allAssets);
         });
-    });
-}
-
-function getUserAssets(address, callback) {
-    let allAssets = [];
-    web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
-        AssetManagerContract.methods.getUserAssets(address).call({ from: props.address }).then(result => {
-            for (res of result) {
-                if (res.id > 0) {
-                    asset = {
-                        id: res.id,
-                        name: res.name,
-                        description: res.description,
-                        totalQuantity: res.totalQuantity,
-                        quantity: res.quantity,
-                        decimal: res.decimal,
-                        issuer: res.issuer,
-                        owner: res.owner
-                    }
-
-                    allAssets.push(asset);
-                }
-            }
-            callback(allAssets);
-        });
-
     });
 }
 
@@ -344,13 +330,22 @@ function transferAsset(address, amount, assetName, callback) {
     });
 }
 
-function getBalances() {
+
+function getUserAssets(address, callback) {
+    web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.methods.getUserAssets(address).call({ from: props.address }).then((result) => {
+            callback(result);
+        });
+    });
+}
+
+function getBalances(address) {
     let allOrders = [];
-    web3.eth.personal.unlockAccount(props.user1.address, 'Wq017kmg@tm').then(() => {
-        AssetManagerContract.methods.getTokenBalance().call({ from: props.user1.address, gas: props.gas, }).then((result) => {
-            console.log(`Token Balance: ${result}`);
-            AssetManagerContract.methods.getEscrowBalance().call({ from: props.user1.address, gas: props.gas, }).then((result) => {
-                console.log(`Escrow Balance: ${result}`);
+    web3.eth.personal.unlockAccount(address, 'Wq017kmg@tm').then(() => {
+        AssetManagerContract.methods.getTokenBalance().call({ from: address, gas: props.gas, }).then((result) => {
+            console.log(`${address} Token Balance: ${result}`);
+            AssetManagerContract.methods.getEscrowBalance().call({ from: address, gas: props.gas, }).then((result) => {
+                console.log(`${address} Escrow Balance: ${result}`);
             });
         });
     });
@@ -361,11 +356,11 @@ async function start() {
         console.log(hash);
         getAssets((allAssets) => {
             console.log(allAssets);
-            transferAsset(props.user1.address, 13150, "BUD", (hash) => {
+            transferAsset(props.user1.address, 113150, "BUD", (hash) => {
                 console.log(hash);
-                postOrder(0, 0, 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
+                postOrder(OrderType.BUY, OrderStrategy.GTC, 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
                     console.log(hash);
-                    postOrderWithAddress(props.user1.address, props.user1.password, 1, 0, 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
+                    postOrderWithAddress(props.user1.address, props.user1.password, OrderType.SELL, OrderStrategy.GTC, 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
                         console.log(hash);
                         processEvents();
                     });
@@ -375,61 +370,41 @@ async function start() {
     });
 }
 
+async function testBuyPartial() {
+    postOrder(OrderType.BUY, OrderStrategy.GTC, 3000, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
+        console.log(hash);
+        postOrderWithAddress(props.user1.address, props.user1.password, OrderType.SELL, OrderStrategy.GTC, 700, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
+            postOrderWithAddress(props.user1.address, props.user1.password, OrderType.SELL, OrderStrategy.GTC, 700, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
+                postOrderWithAddress(props.user2.address, props.user2.password, OrderType.SELL, OrderStrategy.GTC, 700, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
+                    postOrderWithAddress(props.user2.address, props.user2.password, OrderType.SELL, OrderStrategy.GTC, 900, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {
+                        console.log(hash);
+                    });                                                
+                    console.log(hash);
+                });                            
+                console.log(hash);
+            });            
+            console.log(hash);
+        });
+    });    
+}
+
 //start();
-// processEvents();
-postOrder(0, 0, 1750, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
-//postOrderWithAddress(props.user1.address, props.user1.password, 1, 0, 1500, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
-//getOrders("PENDING_ORDERS", (allOrders) => { console.log(allOrders); console.log(allOrders.length) });
+//testBuyPartial();
+// getUserAssets(props.user1.address, (result) => {
+//     console.log(result);
+// });
+// getUserAssets(props.user2.address, (result) => {
+//     console.log(result);
+// });
+//processEvents();
+//getBalances(props.address);
+//getBalances(props.user1.address);
+//getBalances(props.user2.address);
+//postOrder(OrderType.BUY, OrderStrategy.GTC, 1700, 10, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
+//postOrderWithAddress(props.user1.address, props.user1.password, OrderType.SELL, OrderStrategy.MO, 1700, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
+getOrders("PENDING_ORDERS", (allOrders) => { console.log(allOrders); console.log(allOrders.length) });
 //getOrders("BUY_ORDERS", (allOrders) => { console.log(allOrders) });
-// getOrders("SELL_ORDERS", (allOrders) => { console.log(allOrders) });
+ //getOrders("SELL_ORDERS", (allOrders) => { console.log(allOrders) });
 //getOrders("MATCHED_ORDERS", (allOrders) => { console.log(allOrders) });
 //getOrders("DELETED_ORDERS", (allOrders) => { console.log(allOrders) });
-//getUserOrders(props.user1.address, (allOrders) => {console.log(allOrders)});
-
-
-
-
-
-
-
-
-
-    // function testBinarySearch() public {
-    //     OrderModel.SortedKey[] memory keys = new OrderModel.SortedKey[](5);
-    //     keys[0] = OrderModel.SortedKey({
-    //         key: bytes32('key1'),
-    //         date: block.timestamp + 1
-    //     });
-    //     keys[1] = OrderModel.SortedKey({
-    //         key: bytes32('key2'),
-    //         date: block.timestamp + 2
-    //     });        
-    //     keys[2] = OrderModel.SortedKey({
-    //         key: bytes32('key3'),
-    //         date: block.timestamp + 3
-    //     });        
-    //     keys[3] = OrderModel.SortedKey({
-    //         key: bytes32('key4'),
-    //         date: block.timestamp + 4
-    //     });        
-    //     keys[4] = OrderModel.SortedKey({
-    //         key: bytes32('key5'),
-    //         date: block.timestamp + 5
-    //     });  
-
-    //     int256 pos = Constants.binarySearch(keys, 0, 4, keys[2]);         
-
-    //     emit DEBUG(keys.length);
-    //     emit DEBUG(keys);
-    //     emit DEBUG('----------------------------------');
-    //     if (pos >= 0) {         
-    //         uint256 p = uint256(pos);
-    //         emit DEBUG(p);
-    //         for(uint256 i = p; i < 4; i++) {
-    //             keys[i] = keys[i+1];
-    //         }
-    //         delete keys[4];
-    //     }
-    //     emit DEBUG(keys.length);
-    //     emit DEBUG(keys);
-    // }
+//getUserOrders(props.user1.address, (allOrders) => {console.log(allOrders)})s;

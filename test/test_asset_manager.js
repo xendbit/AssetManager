@@ -12,7 +12,7 @@ AssetManagerContract.handleRevert = true;
 const TIMEOUT = 120000;
 let toMatchKey = undefined;
 
-const { getAssets, getOrder, getOrderRequest, testAsset, testOrder, unlockAccounts } = require('./test_utils.js');
+const { OrderStrategy, OrderType, getAssets, getOrder, getOrderRequest, testAsset, testOrder, unlockAccounts } = require('./test_utils.js');
 
 describe('AssetManager Assets & Tokens Tests', () => {
     before(function (done) {
@@ -70,9 +70,9 @@ describe('AssetManager Assets & Tokens Tests', () => {
     }).timeout(TIMEOUT);
 });
 
-describe('AssetManager Normal Orders Test', () => {
+describe.skip('AssetManager Normal Orders Test', () => {
     it('should post (BUY) an order', (done) => {
-        const orderRequest = getOrderRequest(0, 0, 1500, 1, 'BUD', props.address, 0, props.address);
+        const orderRequest = getOrderRequest(OrderType.BUY, OrderStrategy.GTC, 1500, 1, 'BUD', props.address, 0, props.address);
         const value = 1500;
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
             console.log(`Order Posted`);
@@ -88,7 +88,7 @@ describe('AssetManager Normal Orders Test', () => {
     }).timeout(TIMEOUT);
 
     it('should match (SELL) previous order', (done) => {
-        const orderRequest = getOrderRequest(1, 0, 1500, 1, 'BUD', props.address, 0, props.user1.address);
+        const orderRequest = getOrderRequest(OrderType.SELL, OrderStrategy.GTC, 1500, 1, 'BUD', props.address, 0, props.user1.address);
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
             console.log(`Order Posted`);
             getOrder(orderRequest.key, (order) => {
@@ -112,9 +112,9 @@ describe('AssetManager Normal Orders Test', () => {
     }).timeout(TIMEOUT);
 });
 
-describe('AssetManager ALL OR NOTHING Orders Test', () => {
+describe.skip('AssetManager ALL OR NOTHING Orders Test', () => {
     it('should post (BUY) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = getOrderRequest(0, 1, 1500, 1, 'BUD', props.address, 0, props.address);
+        const orderRequest = getOrderRequest(OrderType.BUY, OrderStrategy.AON, 1500, 1, 'BUD', props.address, 0, props.address);
         const value = 1500;
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
             console.log("Order Posted");
@@ -130,7 +130,7 @@ describe('AssetManager ALL OR NOTHING Orders Test', () => {
     }).timeout(TIMEOUT);
 
     it('should match (SELL) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = getOrderRequest(1, 1, 1500, 1, 'BUD', props.address, 0, props.user1.address);
+        const orderRequest = getOrderRequest(OrderType.SELL, OrderStrategy.AON, 1500, 1, 'BUD', props.address, 0, props.user1.address);
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
             console.log(`Order Posted`);
             getOrder(orderRequest.key, (order) => {
@@ -154,7 +154,7 @@ describe('AssetManager ALL OR NOTHING Orders Test', () => {
     }).timeout(TIMEOUT);
 
     it('should post (BUY) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = getOrderRequest(0, 1, 1500, 1, 'BUD', props.address, 0, props.address);
+        const orderRequest = getOrderRequest(OrderType.BUY, OrderStrategy.AON, 1500, 1, 'BUD', props.address, 0, props.address);
         const value = 1500;
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
             console.log("Order Posted");
@@ -170,7 +170,7 @@ describe('AssetManager ALL OR NOTHING Orders Test', () => {
     }).timeout(TIMEOUT);
 
     it ('should NOT match (SELL) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = getOrderRequest(1, 1, 1700, 1, 'BUD', props.address, 0, props.user1.address);
+        const orderRequest = getOrderRequest(OrderType.SELL, OrderStrategy.AON, 1700, 1, 'BUD', props.address, 0, props.user1.address);
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
             console.log("Order Posted");
             getOrder(orderRequest.key, (order) => {
@@ -184,7 +184,7 @@ describe('AssetManager ALL OR NOTHING Orders Test', () => {
     }).timeout(TIMEOUT);
 
     it('should match (SELL) ALL_OR_NOTHING order', (done) => {
-        const orderRequest = getOrderRequest(1, 1, 1500, 1, 'BUD', props.address, 0, props.user1.address);
+        const orderRequest = getOrderRequest(OrderType.SELL, OrderStrategy.AON, 1500, 1, 'BUD', props.address, 0, props.user1.address);
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
             console.log(`Order Posted`);
             getOrder(orderRequest.key, (order) => {
@@ -206,26 +206,11 @@ describe('AssetManager ALL OR NOTHING Orders Test', () => {
             });
         });
     }).timeout(TIMEOUT);
-
-    it.skip('should cancel all pending orders', (done) => {
-        AssetManagerContract.methods.getOrderKeys("PENDING_ORDERS").call({ from: props.address }).then(result => {
-            for(res of result) {
-                AssetManagerContract.methods.cancelOrder(res).send({ from: props.address }).then(() => {
-                    console.log(`Order ${res} cancelled`);                    
-                });
-            }
-            done();
-        });
-    }).timeout(TIMEOUT);
 });
 
 describe.skip('AssetManager Partial Fufil Orders Test', () => {
-    before(function (done) {
-        this.timeout(TIMEOUT);
-        unlockAccounts(done);
-    });
     
-    it('should cancel all pending orders', (done) => {        
+    it.skip('should cancel all pending orders', (done) => {        
         AssetManagerContract.methods.getOrderKeys("PENDING_ORDERS").call({ from: props.address }).then(result => {
             for(res of result) {
                 AssetManagerContract.methods.cancelOrder(res).send({ from: props.address }).then(() => {
@@ -237,7 +222,7 @@ describe.skip('AssetManager Partial Fufil Orders Test', () => {
     }).timeout(TIMEOUT);
 
     it('should post (BUY) an order', (done) => {
-        const orderRequest = getOrderRequest(0, 0, 1000, 1, 'BUD', props.address, 0, props.address);
+        const orderRequest = getOrderRequest(OrderType.BUY, OrderStrategy.GTC, 1000, 1, 'BUD', props.address, 0, props.address);
         const value = 1000;
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
             console.log(`Order Posted`);
@@ -252,7 +237,7 @@ describe.skip('AssetManager Partial Fufil Orders Test', () => {
     }).timeout(TIMEOUT);
 
     it('should partially match (SELL) previous order', (done) => {
-        const orderRequest = getOrderRequest(1, 0, 300, 1, 'BUD', props.address, 0, props.user1.address);
+        const orderRequest = getOrderRequest(OrderType.SELL, OrderStrategy.GTC, 300, 1, 'BUD', props.address, 0, props.user1.address);
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
             console.log(`Order Posted`);
             getOrder(orderRequest.key, (order) => {
@@ -276,7 +261,7 @@ describe.skip('AssetManager Partial Fufil Orders Test', () => {
     }).timeout(TIMEOUT);    
 
     it('should match (SELL) previous order', (done) => {
-        const orderRequest = getOrderRequest(1, 0, 700, 1, 'BUD', props.address, 0, props.user1.address);
+        const orderRequest = getOrderRequest(OrderType.SELL, OrderStrategy.GTC, 700, 1, 'BUD', props.address, 0, props.user1.address);
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
             console.log(`Order Posted`);
             getOrder(orderRequest.key, (order) => {
@@ -298,4 +283,83 @@ describe.skip('AssetManager Partial Fufil Orders Test', () => {
             });
         });
     }).timeout(TIMEOUT);        
+});
+
+describe('AssetManager Market Orders (Sell at any price) Test', () => {
+    it('should post (BUY) an order', (done) => {
+        const orderRequest = getOrderRequest(OrderType.BUY, OrderStrategy.GTC, 1000, 2, 'BUD', props.address, 0, props.address);
+        const value = 2000;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                // testOrder(order);
+                // assert.equal(+order.amount, orderRequest.amount);
+                // assert.equal(+order.price, orderRequest.price);
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+
+    it('should post another (BUY) an order', (done) => {
+        const orderRequest = getOrderRequest(OrderType.BUY, OrderStrategy.GTC, 1000, 1, 'BUD', props.address, 0, props.address);
+        const value = 1000;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                toMatchKey = order.key.key;
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+    
+    it('should match (SELL) previous order', (done) => {
+        const orderRequest = getOrderRequest(OrderType.SELL, OrderStrategy.MO, 700, 1, 'BUD', props.address, 0, props.user1.address);
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, 0);
+                assert.equal(+order.originalAmount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 1);    
+                if (toMatchKey !== undefined) {
+                    getOrder(toMatchKey, (order) => {
+                        testOrder(order);
+                        assert.equal(+order.amount, 300);
+                        assert.equal(+order.originalAmount, 1000);
+                        assert.equal(+order.price, orderRequest.price);        
+                        assert.equal(+order.status, 1);    
+                    });
+                }
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);
+
+    it('should match (SELL) previous order', (done) => {
+        const orderRequest = getOrderRequest(OrderType.SELL, OrderStrategy.MO, 700, 20, 'BUD', props.address, 0, props.user1.address);
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address }).then(() => {
+            console.log(`Order Posted`);
+            getOrder(orderRequest.key, (order) => {
+                testOrder(order);
+                assert.equal(+order.amount, 0);
+                assert.equal(+order.originalAmount, orderRequest.amount);
+                assert.equal(+order.price, orderRequest.price);
+                assert.equal(+order.status, 1);    
+                if (toMatchKey !== undefined) {
+                    getOrder(toMatchKey, (order) => {
+                        testOrder(order);
+                        assert.equal(+order.amount, 0);
+                        assert.equal(+order.originalAmount, 1000);
+                        assert.equal(+order.price, orderRequest.price);        
+                        assert.equal(+order.status, 1);    
+                    });
+                }
+                done();
+            });
+        });
+    }).timeout(TIMEOUT);    
 });

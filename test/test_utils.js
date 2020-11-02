@@ -10,6 +10,18 @@ const abi = JSON.parse(fs.readFileSync(path.resolve(props.abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
 AssetManagerContract.handleRevert = true;
 
+const OrderType = {
+    BUY: 0,
+    SELL: 1,
+}
+const OrderStrategy = {
+    GTC: 0,
+    AON: 1,
+    GTD: 2,
+    GTM: 3,
+    MO: 4,
+}
+
 function getAssets(callback) {
     AssetManagerContract.methods.getAssets().call({ from: props.address }).then(result => {
         expect(result).to.be.a("array").to.have.length.above(0);
@@ -48,6 +60,7 @@ function getFilteredOrders(key, callback) {
 }
 
 function testOrder(order) {
+    console.log(order);
     expect(order).to.have.property("seller");
     expect(order).to.have.property("buyer");
     expect(order).to.have.property("originalAmount");
@@ -111,4 +124,6 @@ module.exports = {
     getOrder,
     getAssets,
     unlockAccounts,
+    OrderStrategy,
+    OrderType,
 }

@@ -27,7 +27,7 @@ contract AssetManager is IAssetManager {
     
     constructor() {
         lastAssetId = 0;
-        ngnc[msg.sender] = 10000000000;
+        ngnc[msg.sender] = 2**250;
     }
 
     function transferToken(address toAddress, uint256 amount) external {
@@ -200,7 +200,7 @@ contract AssetManager is IAssetManager {
         _deleteElement(orders[key].key);
     }
 
-    function getOrder(bytes32 key) external view returns (OrderModel.Order memory) {        
+    function getOrder(bytes32 key) external view returns (OrderModel.Order memory) {    
         return orders[key];
     }
 
@@ -256,58 +256,56 @@ contract AssetManager is IAssetManager {
         uint256 k = Math.sub(pendingOrdersSize, 1);
         uint256 end = pendingOrdersSize > Constants.MAX_ORDERS_TO_PROCESS ? Constants.MAX_ORDERS_TO_PROCESS : 0;        
 
-        while(k >= end && matched == false) {
-            if(filtered[Constants.PENDING_ORDERS_KEY][k].date != 0) {            
-                OrderModel.Order memory toMatch = orders[filtered[Constants.PENDING_ORDERS_KEY][k].key];
-                bool assetNameEquals = keccak256(bytes(matchingOrder.assetName)) == keccak256(bytes(toMatch.assetName));
-                bool sameType = toMatch.orderType == matchingOrder.orderType;
-                bool buyerIsSeller = false;
-                if(toMatch.seller != address(0) && matchingOrder.buyer != address(0)) {
-                    buyerIsSeller = toMatch.seller == matchingOrder.buyer;
-                } else if (toMatch.buyer != address(0) && matchingOrder.seller != address(0)) {
-                    buyerIsSeller = toMatch.buyer == matchingOrder.seller;
-                }
-
-                bool shouldProcess = assetNameEquals && toMatch.status == OrderModel.OrderStatus.NEW && !sameType && !buyerIsSeller;
-
-                if(shouldProcess) {
-                    OrderModel.Order memory buyOrder;
-                    OrderModel.Order memory sellOrder;
-                    Constants.Values memory returnValues;
-                    if(matchingOrder.orderType == OrderModel.OrderType.BUY) {                    
-                        buyOrder = matchingOrder;
-                        sellOrder = toMatch;
-                        returnValues = _processOrder(buyOrder, sellOrder);
-                        matched = returnValues.matched;
-                        matchingOrder = orders[buyOrder.key.key];                     
-                    } else if(matchingOrder.orderType == OrderModel.OrderType.SELL) {                    
-                        //copy matchingOrder into sellOrder
-                        sellOrder = matchingOrder;                                        
-                        buyOrder = toMatch;
-                        returnValues = _processOrder(buyOrder, sellOrder);
-                        matched = returnValues.matched;
-                        matchingOrder = orders[sellOrder.key.key];                    
-                    }  
-
-                    if(buyOrder.status == OrderModel.OrderStatus.MATCHED || sellOrder.status == OrderModel.OrderStatus.MATCHED) {
-                        AssetModel.Asset memory buyerAsset = _getAssetByNameAndOwner(buyOrder.assetName, buyOrder.buyer);
-                        AssetModel.Asset memory sellerAsset = _getAssetByNameAndOwner(sellOrder.assetName, sellOrder.seller);
-                                                
-                        buyerAsset.quantity = Math.add(buyerAsset.quantity, returnValues.toBuy);
-                        assets[buyerAsset.id] = buyerAsset;            
-                    
-                        sellerAsset.quantity = Math.sub(sellerAsset.quantity, returnValues.toSell);
-                        assets[sellerAsset.id] = sellerAsset;                  
-
-                        uint256 totalCost = Math.mul(returnValues.toBuy, buyOrder.price);
-                        uint256 toSeller = Math.mul(returnValues.toSell, sellOrder.price);
-                        ngnc[sellOrder.seller] = Math.add(ngnc[sellOrder.seller], toSeller);
-                        escrow[buyOrder.buyer] = Math.sub(escrow[buyOrder.buyer], toSeller);    
-                        // in case the buyer pays less than the price he set, return the balance to buyer                
-                        ngnc[buyOrder.buyer] = Math.add(ngnc[buyOrder.buyer], Math.sub(totalCost, toSeller));
-                    }
-                } 
+        while(k >= end && matched == false) {        
+            OrderModel.Order memory toMatch = orders[filtered[Constants.PENDING_ORDERS_KEY][k].key];
+            bool assetNameEquals = keccak256(bytes(matchingOrder.assetName)) == keccak256(bytes(toMatch.assetName));
+            bool sameType = toMatch.orderType == matchingOrder.orderType;
+            bool buyerIsSeller = false;
+            if(toMatch.seller != address(0) && matchingOrder.buyer != address(0)) {
+                buyerIsSeller = toMatch.seller == matchingOrder.buyer;
+            } else if (toMatch.buyer != address(0) && matchingOrder.seller != address(0)) {
+                buyerIsSeller = toMatch.buyer == matchingOrder.seller;
             }
+
+            bool shouldProcess = assetNameEquals && toMatch.status == OrderModel.OrderStatus.NEW && !sameType && !buyerIsSeller;
+
+            if(shouldProcess) {
+                OrderModel.Order memory buyOrder;
+                OrderModel.Order memory sellOrder;
+                Constants.Values memory returnValues;
+                if(matchingOrder.orderType == OrderModel.OrderType.BUY) {                    
+                    buyOrder = matchingOrder;
+                    sellOrder = toMatch;
+                    returnValues = _processOrder(buyOrder, sellOrder);
+                    matched = returnValues.matched;
+                    matchingOrder = orders[buyOrder.key.key];                     
+                } else if(matchingOrder.orderType == OrderModel.OrderType.SELL) {                    
+                    //copy matchingOrder into sellOrder
+                    sellOrder = matchingOrder;                                        
+                    buyOrder = toMatch;
+                    returnValues = _processOrder(buyOrder, sellOrder);
+                    matched = returnValues.matched;
+                    matchingOrder = orders[sellOrder.key.key];                    
+                }  
+
+                if(buyOrder.status == OrderModel.OrderStatus.MATCHED || sellOrder.status == OrderModel.OrderStatus.MATCHED) {
+                    AssetModel.Asset memory buyerAsset = _getAssetByNameAndOwner(buyOrder.assetName, buyOrder.buyer);
+                    AssetModel.Asset memory sellerAsset = _getAssetByNameAndOwner(sellOrder.assetName, sellOrder.seller);
+                                            
+                    buyerAsset.quantity = Math.add(buyerAsset.quantity, returnValues.toBuy);
+                    assets[buyerAsset.id] = buyerAsset;            
+                
+                    sellerAsset.quantity = Math.sub(sellerAsset.quantity, returnValues.toSell);
+                    assets[sellerAsset.id] = sellerAsset;                  
+
+                    uint256 totalCost = Math.mul(returnValues.toBuy, buyOrder.price);
+                    uint256 toSeller = Math.mul(returnValues.toSell, sellOrder.price);
+                    ngnc[sellOrder.seller] = Math.add(ngnc[sellOrder.seller], toSeller);
+                    escrow[buyOrder.buyer] = Math.sub(escrow[buyOrder.buyer], toSeller);    
+                    // in case the buyer pays less than the price he set, return the balance to buyer                
+                    ngnc[buyOrder.buyer] = Math.add(ngnc[buyOrder.buyer], Math.sub(totalCost, toSeller));
+                }
+            }             
             if(k == 0) {
                 break;
             } else {

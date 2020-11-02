@@ -2,7 +2,7 @@ const properties = {
     web3URL: 'http://127.0.0.1:8545',//'http://209.250.234.75:8545',
     address: '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', // any unlocked address on the server
     contractor: '0xB6D80F6d661927afEf42f39e52d630E250696bc4', // contract deployer
-    contractAddress: '0x3784eed94077373cDa32816f42c0C591f98fD96b', // address of contract after deploy
+    contractAddress: '0xbF3DDcBA2e709Ec3e059C3c8B81F565D188F8AC3', // address of contract after deploy
     abiPath: 'build/contracts/AssetManager.json',
     gas: '4004356',
     // another unlocked account on the server
