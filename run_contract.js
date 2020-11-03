@@ -388,6 +388,8 @@ async function testBuyPartial() {
     });    
 }
 
+createNewAsset('GULD', 'Guilder', (hash) => {
+});
 //start();
 //testBuyPartial();
 // getUserAssets(props.user1.address, (result) => {
@@ -402,7 +404,7 @@ async function testBuyPartial() {
 //getBalances(props.user2.address);
 //postOrder(OrderType.BUY, OrderStrategy.GTC, 1700, 10, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
 //postOrderWithAddress(props.user1.address, props.user1.password, OrderType.SELL, OrderStrategy.MO, 1700, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
-getOrders("PENDING_ORDERS", (allOrders) => { console.log(allOrders); console.log(allOrders.length) });
+//getOrders("PENDING_ORDERS", (allOrders) => { console.log(allOrders); console.log(allOrders.length) });
 //getOrders("BUY_ORDERS", (allOrders) => { console.log(allOrders) });
  //getOrders("SELL_ORDERS", (allOrders) => { console.log(allOrders) });
 //getOrders("MATCHED_ORDERS", (allOrders) => { console.log(allOrders) });

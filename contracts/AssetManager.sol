@@ -43,10 +43,14 @@ contract AssetManager is IAssetManager {
         return escrow[msg.sender];
     }
 
-    function transferAsset(address toAddress, string memory assetName, uint256 amount) external {
-        AssetModel.Asset memory senderAsset = _getAssetByNameAndOwner(assetName, msg.sender);
-        AssetModel.Asset memory assetToTransfer = _getAssetByNameAndOwner(assetName, toAddress);
+    function transferAsset(address toAddress, string memory assetName, address assetIssuer, uint256 amount) external {
+        AssetModel.Asset memory senderAsset = _getAssetByNameOwnerIssuer(assetName, msg.sender, assetIssuer);
+        AssetModel.Asset memory assetToTransfer = _getAssetByNameOwnerIssuer(assetName, toAddress, assetIssuer);
 
+        if(senderAsset.issuer == address(0)) {
+            emit DEBUG('Asset does not exist');
+            return;
+        }
         if(senderAsset.quantity >= amount) {            
             if(senderAsset.owner == msg.sender && senderAsset.quantity > amount) {                
                 if(assetToTransfer.owner == address(0)) {
@@ -76,7 +80,7 @@ contract AssetManager is IAssetManager {
                 return;
             }
         } else {
-            emit DEBUG("Asset Not Enough");
+            emit DEBUG("Asset Not Enough");            
             return;
         }
     }
@@ -85,8 +89,7 @@ contract AssetManager is IAssetManager {
         AssetModel.validateAsset(ar);  
         AssetModel.Asset memory existing = _getAssetByNameAndIssuer(ar.name, msg.sender);
         if(existing.issuer != address(0) && existing.owner == msg.sender) {
-            emit AssetAlreadyExists(ar);
-            emit DEBUG("Asset exists");
+            emit DEBUG("Asset already exists");
             return;
         } else {
             uint256 lai = lastAssetId;
@@ -137,7 +140,7 @@ contract AssetManager is IAssetManager {
                 buyer = msg.sender;
                 seller = address(0);    
                 
-                AssetModel.Asset memory buyerAsset = _getAssetByNameAndOwner(or.assetName, msg.sender);                
+                AssetModel.Asset memory buyerAsset = _getAssetByNameOwnerIssuer(or.assetName, msg.sender, or.assetIssuer);
                 if(buyerAsset.owner == address(0)) {                
                     buyerAsset = AssetModel.Asset({
                         id: lastAssetId,
@@ -159,7 +162,7 @@ contract AssetManager is IAssetManager {
                 buyer =  address(0);            
                 seller = msg.sender;            
                 //check that you have the asset you want to sell
-                AssetModel.Asset memory sellerAsset = _getAssetByNameAndOwner(or.assetName, msg.sender);
+                AssetModel.Asset memory sellerAsset = _getAssetByNameOwnerIssuer(or.assetName, msg.sender, or.assetIssuer);
                 if(sellerAsset.quantity < or.amount) {
                     emit DEBUG('Not Enough Asset');
                     return;
@@ -178,6 +181,7 @@ contract AssetManager is IAssetManager {
                 seller: seller,
                 buyer: buyer,
                 assetName: or.assetName,
+                assetIssuer: or.assetIssuer,
                 amount: or.amount,
                 originalAmount: or.amount,
                 price: or.price,
@@ -226,9 +230,17 @@ contract AssetManager is IAssetManager {
         return allOrders;
     } 
 
+    function getAsset(string memory name, address issuer) external view returns (AssetModel.Asset memory) {        
+        return _getAssetByNameAndIssuer(name, issuer);
+    } 
+
+    function getAsset(string memory name, address issuer, address owner) external view returns (AssetModel.Asset memory) {        
+        return _getAssetByNameOwnerIssuer(name, owner, issuer);
+    }     
+
     function getAssets() external view returns (AssetModel.Asset[] memory) {        
         AssetModel.Asset[] memory allAssets = new AssetModel.Asset[](lastAssetId);
-        for(uint256 i = 0; i < lastAssetId; i++) {
+        for(uint256 i = 0; i < lastAssetId; i++) {            
             allAssets[i] = assets[i];
         }
         
@@ -289,8 +301,8 @@ contract AssetManager is IAssetManager {
                 }  
 
                 if(buyOrder.status == OrderModel.OrderStatus.MATCHED || sellOrder.status == OrderModel.OrderStatus.MATCHED) {
-                    AssetModel.Asset memory buyerAsset = _getAssetByNameAndOwner(buyOrder.assetName, buyOrder.buyer);
-                    AssetModel.Asset memory sellerAsset = _getAssetByNameAndOwner(sellOrder.assetName, sellOrder.seller);
+                    AssetModel.Asset memory buyerAsset = _getAssetByNameOwnerIssuer(buyOrder.assetName, buyOrder.buyer, buyOrder.assetIssuer);
+                    AssetModel.Asset memory sellerAsset = _getAssetByNameOwnerIssuer(sellOrder.assetName, sellOrder.seller, sellOrder.assetIssuer);
                                             
                     buyerAsset.quantity = Math.add(buyerAsset.quantity, returnValues.toBuy);
                     assets[buyerAsset.id] = buyerAsset;            
@@ -429,11 +441,11 @@ contract AssetManager is IAssetManager {
         }
     }    
 
-    function _getAssetByNameAndOwner(string memory name, address owner) private view returns (AssetModel.Asset memory) {
+    function _getAssetByNameOwnerIssuer(string memory name, address owner, address issuer) private view returns (AssetModel.Asset memory) {
         for(uint256 i = 0; i < lastAssetId; i++) {
             AssetModel.Asset memory asset = assets[i];
             string memory assetName = asset.name;
-            if(keccak256((bytes(assetName))) == keccak256(bytes(name)) && asset.owner == owner) {
+            if(keccak256((bytes(assetName))) == keccak256(bytes(name)) && asset.owner == owner && asset.issuer == issuer) {
                 return asset;
             }
         }

@@ -37,10 +37,28 @@ describe('AssetManager Assets & Tokens Tests', () => {
         });
     }).timeout(TIMEOUT);
 
-    it('should transfer asset', (done) => {
+    it(`should transfer asset to ${props.user1.address}`, (done) => {
         let address = props.user1.address;
         let assetName = 'BUD';
-        let amount = 31251;
+        let amount = 131251;
+        AssetManagerContract.methods.transferAsset(address, assetName, amount).send({ from: props.address }).then(() => {
+            console.log("Asset Transfered");
+            getAssets((result) => {
+                let asset = result[result.length - 1];
+                testAsset(asset);
+                expect(asset).to.have.property("quantity");
+                let q = +asset['quantity'];
+                console.log(q);
+                expect(q).to.be.gte(3125);
+                done();
+            })
+        });
+    }).timeout(TIMEOUT);
+
+    it(`should transfer asset to ${props.user2.address}`, (done) => {
+        let address = props.user2.address;
+        let assetName = 'BUD';
+        let amount = 131251;
         AssetManagerContract.methods.transferAsset(address, assetName, amount).send({ from: props.address }).then(() => {
             console.log("Asset Transfered");
             getAssets((result) => {
@@ -70,7 +88,7 @@ describe('AssetManager Assets & Tokens Tests', () => {
     }).timeout(TIMEOUT);
 });
 
-describe.skip('AssetManager Normal Orders Test', () => {
+describe('AssetManager Normal Orders Test', () => {
     it('should post (BUY) an order', (done) => {
         const orderRequest = getOrderRequest(OrderType.BUY, OrderStrategy.GTC, 1500, 1, 'BUD', props.address, 0, props.address);
         const value = 1500;
@@ -208,7 +226,7 @@ describe.skip('AssetManager ALL OR NOTHING Orders Test', () => {
     }).timeout(TIMEOUT);
 });
 
-describe.skip('AssetManager Partial Fufil Orders Test', () => {
+describe('AssetManager Partial Fufil Orders Test', () => {
     
     it.skip('should cancel all pending orders', (done) => {        
         AssetManagerContract.methods.getOrderKeys("PENDING_ORDERS").call({ from: props.address }).then(result => {
@@ -285,7 +303,7 @@ describe.skip('AssetManager Partial Fufil Orders Test', () => {
     }).timeout(TIMEOUT);        
 });
 
-describe('AssetManager Market Orders (Sell at any price) Test', () => {
+describe.skip('AssetManager Market Orders (Sell at any price) Test', () => {
     it('should post (BUY) an order', (done) => {
         const orderRequest = getOrderRequest(OrderType.BUY, OrderStrategy.GTC, 1000, 2, 'BUD', props.address, 0, props.address);
         const value = 2000;

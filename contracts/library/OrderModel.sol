@@ -31,6 +31,7 @@ library OrderModel {
         address seller;
         address buyer;
         string assetName;
+        address assetIssuer;
         uint256 amount;
         uint256 originalAmount;
         uint256 price;
