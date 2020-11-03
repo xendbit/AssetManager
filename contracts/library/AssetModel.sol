@@ -12,6 +12,7 @@ library AssetModel {
         string description;
         uint256 totalQuantity;
         uint256 quantity;
+        uint256 price;
         uint256 decimal;
         address issuer;
         address owner;
@@ -21,36 +22,8 @@ library AssetModel {
         string name;
         string description;
         uint256 totalQuantity;
+        uint256 price;
         uint256 decimal;
-    }
-
-    function cloneAsset(Asset memory a) public pure returns (Asset memory) {
-        Asset memory newAsset = Asset({
-            id: a.id,
-            name: a.name,
-            description: a.description,
-            totalQuantity: a.totalQuantity,
-            quantity: a.quantity,
-            decimal: a.decimal,
-            issuer: a.issuer,
-            owner: a.owner
-        });
-
-        return newAsset;
-    }
-
-    // copy a into b
-    function copyAsset(Asset memory a) public pure returns (Asset memory b) {
-        b.id = a.id;
-        b.name = a.name;
-        b.description = a.description;
-        b.totalQuantity = a.totalQuantity;
-        b.quantity = a.quantity;
-        b.decimal = a.decimal;
-        b.issuer = a.issuer;
-        b.owner = a.owner;
-
-        return b;        
     }
 
     function validateAsset(AssetRequest memory asset) public pure {
@@ -66,6 +39,7 @@ library AssetModel {
             name: '',
             description: '',
             totalQuantity: 0,
+            price: 0,
             quantity: 0,
             decimal: 0,
             issuer: address(0),

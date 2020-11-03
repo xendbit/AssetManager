@@ -23,9 +23,9 @@ const OrderStrategy = {
 
 function importAddress() {
     // main mac - default
-    //web3.eth.personal.importRawKey(props.privKey, 'Wq017kmg@tm');
-    web3.eth.personal.importRawKey(props.user2.privKey, 'Wq017kmg@tm');
-    web3.eth.personal.importRawKey(props.user1.privKey, 'Wq017kmg@tm');
+    web3.eth.personal.importRawKey('416923edfd58ab2fe988a317a0a4adb6d89c19abce5816686d9a573073e7ca67', 'Wq017kmg@tm');
+    // web3.eth.personal.importRawKey(props.user2.privKey, 'Wq017kmg@tm');
+    // web3.eth.personal.importRawKey(props.user1.privKey, 'Wq017kmg@tm');
 }
 
 function processEvents() {
@@ -388,9 +388,10 @@ async function testBuyPartial() {
     });    
 }
 
-createNewAsset('GULD', 'Guilder', (hash) => {
-});
-//start();
+//importAddress();
+// createNewAsset('GULD', 'Guilder', (hash) => {
+// });
+start();
 //testBuyPartial();
 // getUserAssets(props.user1.address, (result) => {
 //     console.log(result);

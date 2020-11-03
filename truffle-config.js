@@ -42,11 +42,18 @@ module.exports = {
     // tab if you use this network and you must also set the `host`, `port` and `network_id`
     // options below to some value.
     //
+    production: {
+      host: "209.250.234.75",     // Localhost (default: none)
+      port: 8545,            // Standard Ethereum port (default: none)
+      network_id: "1337",       // Any network (default: none)
+      from: "0x9e8e11b145403dc6cb3e002d90f0d715817ae323",
+    },
     development: {
       host: "127.0.0.1",     // Localhost (default: none)
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "1337",       // Any network (default: none)
-    },
+      from: "0xB6D80F6d661927afEf42f39e52d630E250696bc4",
+    },    
     // Another network with more advanced options...
     // advanced: {
     // port: 8777,             // Custom port
@@ -87,7 +94,7 @@ module.exports = {
       settings: {          // See the solidity docs for advice about optimization and evmVersion
         optimizer: {
           enabled: true,
-          runs: 20
+          runs: 200
         },
         //  evmVersion: "byzantium"
       }

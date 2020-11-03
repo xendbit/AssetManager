@@ -20,77 +20,39 @@ contract AssetManager is IAssetManager {
     mapping (bytes32 => OrderModel.SortedKey[]) filtered;
     mapping (address => OrderModel.SortedKey[]) userOrders;
 
-    // store NGNC, key is address (ngnc is in wei)
-    mapping(address => uint256) ngnc;
-    // store NGNC that is tied down by a buy order, key is address
+    // store xether, key is address (xether is in wei)
+    mapping(address => uint256) xether;
+    // store xether that is tied down by a buy order, key is address
     mapping(address => uint256) escrow;
     
     constructor() {
         lastAssetId = 0;
-        ngnc[msg.sender] = 2**250;
+        xether[msg.sender] = 2**250;
     }
 
     function transferToken(address toAddress, uint256 amount) external {
-        ngnc[msg.sender] = Math.sub(ngnc[msg.sender], amount);
-        ngnc[toAddress] = Math.add(ngnc[toAddress], amount);    
+        xether[msg.sender] = Math.sub(xether[msg.sender], amount);
+        xether[toAddress] = Math.add(xether[toAddress], amount);    
     }
 
     function getTokenBalance() external view returns (uint256){
-        return ngnc[msg.sender];
+        return xether[msg.sender];
     }
 
     function getEscrowBalance() external view returns (uint256){
         return escrow[msg.sender];
     }
-
-    function transferAsset(address toAddress, string memory assetName, address assetIssuer, uint256 amount) external {
-        AssetModel.Asset memory senderAsset = _getAssetByNameOwnerIssuer(assetName, msg.sender, assetIssuer);
-        AssetModel.Asset memory assetToTransfer = _getAssetByNameOwnerIssuer(assetName, toAddress, assetIssuer);
-
-        if(senderAsset.issuer == address(0)) {
-            emit DEBUG('Asset does not exist');
-            return;
-        }
-        if(senderAsset.quantity >= amount) {            
-            if(senderAsset.owner == msg.sender && senderAsset.quantity > amount) {                
-                if(assetToTransfer.owner == address(0)) {
-                    
-                    senderAsset.quantity = Math.sub(senderAsset.quantity, amount);
-                    assets[senderAsset.id] = senderAsset;
-                    assetToTransfer = AssetModel.Asset({
-                        id: lastAssetId,
-                        name: assetName,
-                        description: senderAsset.description,
-                        totalQuantity: senderAsset.totalQuantity,
-                        quantity: amount,
-                        decimal: senderAsset.decimal,
-                        owner: toAddress,
-                        issuer: senderAsset.issuer
-                    });
-                    assets[lastAssetId] = assetToTransfer;     
-                    lastAssetId = Math.add(lastAssetId, 1);                    
-                } else {
-                    senderAsset.quantity = Math.sub(senderAsset.quantity, amount);
-                    assetToTransfer.quantity = Math.add(assetToTransfer.quantity, amount);                                    
-                    assets[assetToTransfer.id] = assetToTransfer;        
-                    assets[senderAsset.id] = senderAsset;
-                }            
-            } else {
-                emit DEBUG("Asset not found");
-                return;
-            }
-        } else {
-            emit DEBUG("Asset Not Enough");            
-            return;
-        }
-    }
     
+    function transferAsset(address toAddress, string memory assetName, address assetIssuer, uint256 amount, uint256 price) external {
+        address fromAddress = msg.sender;
+        _transferAsset(fromAddress, toAddress, assetName, assetIssuer, amount, price);
+    }
+
     function createAsset(AssetModel.AssetRequest memory ar) external {
         AssetModel.validateAsset(ar);  
         AssetModel.Asset memory existing = _getAssetByNameAndIssuer(ar.name, msg.sender);
         if(existing.issuer != address(0) && existing.owner == msg.sender) {
-            emit DEBUG("Asset already exists");
-            return;
+            emit DEBUG("Asset exists");
         } else {
             uint256 lai = lastAssetId;
             AssetModel.Asset memory asset = AssetModel.Asset({
@@ -98,6 +60,7 @@ contract AssetManager is IAssetManager {
                 name: ar.name,
                 description: ar.description,
                 totalQuantity: ar.totalQuantity,
+                price: ar.price,
                 quantity: ar.totalQuantity,
                 decimal: ar.decimal,
                 issuer: msg.sender,
@@ -124,16 +87,16 @@ contract AssetManager is IAssetManager {
             if(or.orderType == OrderModel.OrderType.BUY) {
                 uint256 totalCost = Math.mul(or.amount, or.price);
                 
-                uint256 buyerNgncBalance = ngnc[msg.sender];
+                uint256 buyerNgncBalance = xether[msg.sender];
 
                 uint256 totalNgncValue = Math.add(buyerNgncBalance, msg.value);
 
                 if(totalNgncValue >= totalCost) {
-                    ngnc[msg.sender] = totalNgncValue;
-                    ngnc[msg.sender] = Math.sub(ngnc[msg.sender], totalCost);
+                    xether[msg.sender] = totalNgncValue;
+                    xether[msg.sender] = Math.sub(xether[msg.sender], totalCost);
                     escrow[msg.sender] = Math.add(escrow[msg.sender], totalCost);
                 } else {
-                    emit DEBUG("Not Enough Ether");
+                    emit DEBUG("Low Balance");
                     return;
                 }
 
@@ -147,6 +110,7 @@ contract AssetManager is IAssetManager {
                         name: or.assetName,
                         description: asset.description,
                         totalQuantity: asset.totalQuantity,
+                        price: asset.price,
                         quantity: 0,
                         decimal: asset.decimal,
                         owner: msg.sender,
@@ -223,8 +187,7 @@ contract AssetManager is IAssetManager {
 
         OrderModel.Order[] memory allOrders = new OrderModel.Order[](size);
         for(uint256 i = 0; i < size; i++) {    
-            bytes32 key = userOrders[user][i].key;
-            allOrders[i] = orders[key];
+            allOrders[i] = orders[userOrders[user][i].key];
         }
 
         return allOrders;
@@ -258,7 +221,7 @@ contract AssetManager is IAssetManager {
         return allAssets;
     } 
 
-    function _matchOrder(OrderModel.Order memory matchingOrder) private {                
+    function _matchOrder(OrderModel.Order memory matchingOrder) internal {                
         bool matched = false;
         uint256 pendingOrdersSize = filtered[Constants.PENDING_ORDERS_KEY].length;
         if(pendingOrdersSize == 1) {
@@ -312,10 +275,10 @@ contract AssetManager is IAssetManager {
 
                     uint256 totalCost = Math.mul(returnValues.toBuy, buyOrder.price);
                     uint256 toSeller = Math.mul(returnValues.toSell, sellOrder.price);
-                    ngnc[sellOrder.seller] = Math.add(ngnc[sellOrder.seller], toSeller);
                     escrow[buyOrder.buyer] = Math.sub(escrow[buyOrder.buyer], toSeller);    
+                    xether[sellOrder.seller] = Math.add(xether[sellOrder.seller], toSeller);                    
                     // in case the buyer pays less than the price he set, return the balance to buyer                
-                    ngnc[buyOrder.buyer] = Math.add(ngnc[buyOrder.buyer], Math.sub(totalCost, toSeller));
+                    xether[buyOrder.buyer] = Math.add(xether[buyOrder.buyer], Math.sub(totalCost, toSeller));
                 }
             }             
             if(k == 0) {
@@ -326,7 +289,7 @@ contract AssetManager is IAssetManager {
         }
     }
 
-    function _processOrder(OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private returns (Constants.Values memory returnValues) {
+    function _processOrder(OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) internal returns (Constants.Values memory returnValues) {
         returnValues = Constants.Values({
             matched: false,
             buyExpired: false,
@@ -368,7 +331,7 @@ contract AssetManager is IAssetManager {
         orders[buyOrder.key.key] = buyOrder;        
     }
 
-    function _processOrderSameAmount(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private {
+    function _processOrderSameAmount(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) internal {
         returnValues.toBuy = buyOrder.amount;
         returnValues.toSell = sellOrder.amount;
         returnValues.matched = true;
@@ -380,7 +343,7 @@ contract AssetManager is IAssetManager {
         emit OrderSold(sellOrder);        
     }
 
-    function _processOrderBuyPartial(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private {
+    function _processOrderBuyPartial(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) internal {
         returnValues.toBuy = sellOrder.amount;
         returnValues.toSell = sellOrder.amount;
         buyOrder.amount = Math.sub(buyOrder.amount, sellOrder.amount);
@@ -389,7 +352,7 @@ contract AssetManager is IAssetManager {
         emit OrderSold(sellOrder);
     }
 
-    function _processOrderSellPartial(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) private {
+    function _processOrderSellPartial(Constants.Values memory returnValues, OrderModel.Order memory buyOrder, OrderModel.Order memory sellOrder) internal {
         returnValues.toBuy = buyOrder.amount;
         returnValues.toSell = buyOrder.amount;
         sellOrder.amount = Math.sub(sellOrder.amount, buyOrder.amount);
@@ -398,7 +361,7 @@ contract AssetManager is IAssetManager {
         emit OrderBought(buyOrder);                        
     }
 
-    function _populateFilteredOrders(OrderModel.SortedKey memory key, OrderModel.OrderType orderType, address buyer, address seller) private {
+    function _populateFilteredOrders(OrderModel.SortedKey memory key, OrderModel.OrderType orderType, address buyer, address seller) internal {
         filtered[Constants.PENDING_ORDERS_KEY].push(key);    
 
         if(orderType == OrderModel.OrderType.BUY) {
@@ -410,7 +373,7 @@ contract AssetManager is IAssetManager {
         }        
     }
 
-    function _filterMatchedOrder(OrderModel.Order memory order) private {
+    function _filterMatchedOrder(OrderModel.Order memory order) internal {
         OrderModel.SortedKey memory key = order.key;  
         _deleteElement(key);
         
@@ -419,7 +382,7 @@ contract AssetManager is IAssetManager {
         order.statusDate = block.timestamp;                
     }
 
-    function _deleteElement(OrderModel.SortedKey memory key) private { 
+    function _deleteElement(OrderModel.SortedKey memory key) internal { 
         if(filtered[Constants.PENDING_ORDERS_KEY].length == 0) {
             return;
         }
@@ -441,11 +404,10 @@ contract AssetManager is IAssetManager {
         }
     }    
 
-    function _getAssetByNameOwnerIssuer(string memory name, address owner, address issuer) private view returns (AssetModel.Asset memory) {
+    function _getAssetByNameOwnerIssuer(string memory name, address owner, address issuer) internal view returns (AssetModel.Asset memory) {
         for(uint256 i = 0; i < lastAssetId; i++) {
             AssetModel.Asset memory asset = assets[i];
-            string memory assetName = asset.name;
-            if(keccak256((bytes(assetName))) == keccak256(bytes(name)) && asset.owner == owner && asset.issuer == issuer) {
+            if(keccak256((bytes(asset.name))) == keccak256(bytes(name)) && asset.owner == owner && asset.issuer == issuer) {
                 return asset;
             }
         }
@@ -453,15 +415,57 @@ contract AssetManager is IAssetManager {
         return AssetModel.nullAsset();
     }
 
-    function _getAssetByNameAndIssuer(string memory name, address issuer) private view returns (AssetModel.Asset memory) {
+    function _getAssetByNameAndIssuer(string memory name, address issuer) internal view returns (AssetModel.Asset memory) {
         for(uint256 i = 0; i < lastAssetId; i++) {
             AssetModel.Asset memory asset = assets[i];
-            string memory assetName = asset.name;
-            if(keccak256((bytes(assetName))) == keccak256(bytes(name)) && asset.issuer == issuer) {
+            if(keccak256((bytes(asset.name))) == keccak256(bytes(name)) && asset.issuer == issuer) {
                 return asset;
             }
         }
 
         return AssetModel.nullAsset();
     }
+
+    function _transferAsset(address fromAddress, address toAddress, string memory assetName, address assetIssuer, uint256 amount, uint256 price) internal {
+        AssetModel.Asset memory senderAsset = _getAssetByNameOwnerIssuer(assetName, fromAddress, assetIssuer);
+        AssetModel.Asset memory assetToTransfer = _getAssetByNameOwnerIssuer(assetName, toAddress, assetIssuer);
+
+        if(senderAsset.issuer == address(0)) {
+            emit DEBUG('Asset not found');
+            return;
+        }       
+        if(senderAsset.quantity > amount) {                
+            if(assetToTransfer.owner == address(0)) {                
+                senderAsset.quantity = Math.sub(senderAsset.quantity, amount);
+                assets[senderAsset.id] = senderAsset;
+                assetToTransfer = AssetModel.Asset({
+                    id: lastAssetId,
+                    name: assetName,
+                    description: senderAsset.description,
+                    totalQuantity: senderAsset.totalQuantity,
+                    price: senderAsset.price,
+                    quantity: amount,
+                    decimal: senderAsset.decimal,
+                    owner: toAddress,
+                    issuer: senderAsset.issuer
+                });
+                assets[lastAssetId] = assetToTransfer;     
+                lastAssetId = Math.add(lastAssetId, 1);                    
+            } else {
+                senderAsset.quantity = Math.sub(senderAsset.quantity, amount);
+                assetToTransfer.quantity = Math.add(assetToTransfer.quantity, amount);                                    
+                assets[assetToTransfer.id] = assetToTransfer;        
+                assets[senderAsset.id] = senderAsset;
+            }
+            if(price == 0) {
+                price = senderAsset.price;
+            }
+            uint256 totalCost = Math.mul(amount, price);
+            xether[toAddress] = Math.sub(xether[toAddress], totalCost);
+            xether[fromAddress] = Math.add(xether[fromAddress], totalCost);
+        } else {
+            emit DEBUG("Balance Too Low");
+            return;
+        }
+    }    
 }

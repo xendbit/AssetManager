@@ -14,5 +14,5 @@ interface IAssetManager {
     event DEBUG(string str);
     event DEBUG(uint256 str);
     event DEBUG(bool str);
-    event DEBUG(OrderModel.SortedKey[] str);
+    event DEBUG(OrderModel.SortedKey[] str);    
 }

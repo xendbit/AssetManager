@@ -6,4 +6,4 @@ build
 api/asset-manager-api/AssetManager.db
 api/asset-manager-api/dist/
 api/asset-manager-api/package-lock.json
-
+*.env.js
