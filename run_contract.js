@@ -41,6 +41,10 @@ function processEvents() {
                 if (e.event === 'DEBUG') {
                     console.error(e.returnValues['str']);
                 }
+
+                if (e.event === 'AssetCreated') {
+                    console.error(e.returnValues['asset']);
+                }                
             }
         });
     });
@@ -51,9 +55,12 @@ function createNewAsset(name, desc, callback) {
         name: name,
         description: desc,
         totalQuantity: 100000000,
-        decimal: 2
+        price: 100,
+        decimal: 0
     }
 
+    console.log(assetRequest);
+    
     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
         AssetManagerContract.methods.createAsset(assetRequest).send({ from: props.address }).then(() => {
             callback('Asset Created');
@@ -389,22 +396,15 @@ async function testBuyPartial() {
 }
 
 //importAddress();
-// createNewAsset('GULD', 'Guilder', (hash) => {
-// });
-start();
+//start();
 //testBuyPartial();
-// getUserAssets(props.user1.address, (result) => {
-//     console.log(result);
-// });
-// getUserAssets(props.user2.address, (result) => {
-//     console.log(result);
-// });
-//processEvents();
+processEvents();
 //getBalances(props.address);
 //getBalances(props.user1.address);
 //getBalances(props.user2.address);
-//postOrder(OrderType.BUY, OrderStrategy.GTC, 1700, 10, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
-//postOrderWithAddress(props.user1.address, props.user1.password, OrderType.SELL, OrderStrategy.MO, 1700, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
+//postOrder(OrderType.BUY, OrderStrategy.GTC, 1700, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
+//postOrderWithAddress(props.user1.address, props.user1.password, OrderType.BUY, OrderStrategy.GTC, 1700, 1, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
+//postOrderWithAddress(props.user1.address, props.user1.password, OrderType.SELL, OrderStrategy.MO, 3700, 10, 'BUD', '0x94Ce615ca10EFb74cED680298CD7bdB0479940bc', 0, (hash) => {console.log(hash);});
 //getOrders("PENDING_ORDERS", (allOrders) => { console.log(allOrders); console.log(allOrders.length) });
 //getOrders("BUY_ORDERS", (allOrders) => { console.log(allOrders) });
  //getOrders("SELL_ORDERS", (allOrders) => { console.log(allOrders) });

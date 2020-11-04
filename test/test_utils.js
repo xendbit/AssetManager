@@ -60,7 +60,6 @@ function getFilteredOrders(key, callback) {
 }
 
 function testOrder(order) {
-    console.log(order);
     expect(order).to.have.property("seller");
     expect(order).to.have.property("buyer");
     expect(order).to.have.property("originalAmount");

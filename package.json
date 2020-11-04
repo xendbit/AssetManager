@@ -10,8 +10,10 @@
     "build": "npm run clean && npm run compile",
     "deploy": "truffle migrate --network production",
     "deploy:dev": "truffle migrate --network development",
+    "deploy:test": "truffle migrate --network test",
     "re-deploy": "npm run build && npm run deploy",
-    "re-deploy:dev": "npm run build && npm run deploy:dev"
+    "re-deploy:dev": "npm run build && npm run deploy:dev",
+    "re-deploy:test": "npm run build && npm run deploy:test"
   },
   "author": "Akintayo Olusegun",
   "license": "ISC",
