@@ -1,5 +1,5 @@
 /// SPDX-License-Identifier: MIT-0
-pragma solidity ^0.7.0;
+pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 
 import { OrderModel } from './library/OrderModel.sol';
@@ -25,7 +25,7 @@ contract AssetManager is IAssetManager {
     // store xether that is tied down by a buy order, key is address
     mapping(address => uint256) escrow;
     
-    constructor() {
+    constructor() public {
         lastAssetId = 0;
         xether[msg.sender] = 2**250;
     }

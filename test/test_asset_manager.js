@@ -14,7 +14,7 @@ let toMatchKey = undefined;
 
 const { OrderStrategy, OrderType, getAssets, getOrder, getOrderRequest, testAsset, testOrder, unlockAccounts } = require('./test_utils.js');
 
-describe('AssetManager Assets & Tokens Tests', () => {
+describe.skip('AssetManager Assets & Tokens Tests', () => {
     before(function (done) {
         this.timeout(TIMEOUT);
         unlockAccounts(done);
@@ -33,7 +33,7 @@ describe('AssetManager Assets & Tokens Tests', () => {
             getAssets((result) => {
                 let asset = result[0];
                 testAsset(asset);
-                done()
+                done();
             });
         });
     }).timeout(TIMEOUT);
@@ -105,7 +105,7 @@ describe('AssetManager Assets & Tokens Tests', () => {
     }).timeout(TIMEOUT);
 });
 
-describe('AssetManager Normal Orders Test', () => {
+describe.skip('AssetManager Normal Orders Test', () => {
     before(function (done) {
         this.timeout(TIMEOUT);
         unlockAccounts(done);
@@ -152,7 +152,7 @@ describe('AssetManager Normal Orders Test', () => {
     }).timeout(TIMEOUT);
 });
 
-describe('AssetManager ALL OR NOTHING Orders Test', () => {
+describe.skip('AssetManager ALL OR NOTHING Orders Test', () => {
     before(function (done) {
         this.timeout(TIMEOUT);
         unlockAccounts(done);
@@ -253,7 +253,7 @@ describe('AssetManager ALL OR NOTHING Orders Test', () => {
     }).timeout(TIMEOUT);
 });
 
-describe('AssetManager Partial Fufil Orders Test', () => {
+describe.skip('AssetManager Partial Fufil Orders Test', () => {
     before(function (done) {
         this.timeout(TIMEOUT);
         unlockAccounts(done);
@@ -334,7 +334,7 @@ describe('AssetManager Partial Fufil Orders Test', () => {
     }).timeout(TIMEOUT);        
 });
 
-describe('AssetManager Market Orders (Sell at any price) Test', () => {
+describe.skip('AssetManager Market Orders (Sell at any price) Test', () => {
     before(function (done) {
         this.timeout(TIMEOUT);
         unlockAccounts(done);
