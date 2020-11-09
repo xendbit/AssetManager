@@ -24,13 +24,14 @@ contract AssetManagerV2 is ERC721('NSE Art Exchange', 'ARTX') {
     }
 
     function mint(AssetModelV2.AssetRequest memory ar) external {
+        AssetModelV2.validateAsset(ar);
         require(owner == msg.sender);        
         _safeMint(msg.sender, ar.tokenId);
         // create an ERC20 Smart contract and assign the shares to issuer
         ShareContract shareContract = new ShareContract(ar.name, ar.symbol, ar.totalQuantity, ar.price, ar.issuer);
         shares[ar.tokenId] = shareContract;
     }
-    
+
     function ownedShares(uint256 tokenId, address userAddress) external view returns(uint256) {
         ShareContract shareContract = shares[tokenId];
         return shareContract.allowance(userAddress, address(this));
@@ -43,6 +44,17 @@ contract AssetManagerV2 is ERC721('NSE Art Exchange', 'ARTX') {
         shareContract.allow(recipient, amount);
     }
 
+    function transferTokenOwnership(uint256 tokenId, address recipient) external {
+        ShareContract shareContract = shares[tokenId];
+        uint256 sharesOwned = shareContract.allowance(msg.sender, address(this));
+
+        // first transfer the shares owned by the caller in tokenId
+        shareContract.transferFrom(msg.sender, recipient, sharesOwned);      
+        shareContract.allow(recipient, sharesOwned);
+        // then transfer ownership of the token
+        safeTransferFrom(msg.sender, recipient, tokenId);        
+    }
+    
     function walletBalance(address userAddress) external view returns(uint256) {
         return wallet.allowance(userAddress, address(this));
     }
@@ -71,8 +83,18 @@ contract AssetManagerV2 is ERC721('NSE Art Exchange', 'ARTX') {
         shareContract.allow(buyer, amount);
     }
 
-    function sharesContract(uint256 tokenId) external view returns (address, uint256, string memory, string memory, uint256, uint256) {        
+    function tokenShares(uint256 tokenId) external view returns (AssetModelV2.TokenShares memory) {        
+        address tokenOwner = ownerOf(tokenId);
         ShareContract shareContract = shares[tokenId];
-        return shareContract.details(tokenId);
+        (address sharesContract, string memory name, string memory symbol, uint256 totalSupply, uint256 issuingPrice) = shareContract.details();
+        return AssetModelV2.TokenShares({
+            tokenId: tokenId,
+            owner: tokenOwner,
+            sharesContract: sharesContract,
+            name: name,
+            symbol: symbol,            
+            totalSupply: totalSupply,
+            issuingPrice: issuingPrice
+        });
     }
 }

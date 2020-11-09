@@ -53,6 +53,8 @@ module.exports = {
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "1337",       // Any network (default: none)
       from: "0xB6D80F6d661927afEf42f39e52d630E250696bc4",
+      gas: 5116420,
+      gasPrice: 0,
     },    
     // Another network with more advanced options...
     // advanced: {

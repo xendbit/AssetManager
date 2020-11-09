@@ -46,15 +46,17 @@ describe('Asset Manager V2 Minting Test', () => {
     });
 
     it('Should mint a new token', (done) => {
-        AssetManagerContract.methods.mint(ar).send({ from: props.contractor }).then(() => {
+        AssetManagerContract.methods.mint(ar).send({ from: props.contractor, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             console.log('Asset Minted');
             issuerBalance += ar.totalQuantity;
             done();
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
     it('Should not mint a new token (token id must be unique)', (done) => {
-        AssetManagerContract.methods.mint(ar).send({ from: props.contractor }).then(() => {
+        AssetManagerContract.methods.mint(ar).send({ from: props.contractor, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             done();
         }, (error) => {
             try {
@@ -68,7 +70,7 @@ describe('Asset Manager V2 Minting Test', () => {
     }).timeout(TIMEOUT);
 
     it('Should not mint a new token (minter must be contractor)', (done) => {
-        AssetManagerContract.methods.mint(ar2).send({ from: props.address }).then(() => {
+        AssetManagerContract.methods.mint(ar2).send({ from: props.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             done();
         }, (error) => {
             try {
@@ -82,25 +84,22 @@ describe('Asset Manager V2 Minting Test', () => {
     }).timeout(TIMEOUT);
 
     it('Should check token share contract is not empty', (done) => {
-        AssetManagerContract.methods.sharesContract(ar.tokenId).call().then((sca) => {
+        AssetManagerContract.methods.tokenShares(ar.tokenId).call().then((sca) => {
+            console.log(sca);
             try {
-                // Result {
-                //     '0': '0x728315F1bA7954E8263CC0B203D21C8953bd11D9',
-                //     '1': '12331059',
-                //     '2': 'Test Asset',
-                //     '3': 'TAX',
-                //     '4': '1000000',
-                //     '5': '10' }                                
-                assert.notEqual(sca[0], "0x0000000000000000000000000000000000000000");
-                assert.equal(sca[1], ar.tokenId);
-                assert.equal(sca[2], ar.name);
-                assert.equal(sca[3], ar.symbol);
-                assert.equal(sca[4], ar.totalQuantity);
-                assert.equal(sca[5], ar.price);
+                assert.equal(sca.owner, props.contractor);
+                assert.equal(sca.tokenId, ar.tokenId);
+                assert.equal(sca.name, ar.name);
+                assert.equal(sca.symbol, ar.symbol);
+                assert.equal(sca.totalSupply, ar.totalQuantity);
+                assert.equal(sca.issuingPrice, ar.price);
+                assert.notEqual(sca.sharesContract, "0x0000000000000000000000000000000000000000");
                 done();
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -126,7 +125,53 @@ describe('Asset Manager V2 Minting Test', () => {
                 });
             });
         });
-    });
+    }).timeout(TIMEOUT);    
+});
+
+describe('Asset Manager Token Transfer Tests', () => {
+    it('Should transfer token ownership', (done) => {
+        AssetManagerContract.methods.transferTokenOwnership(ar.tokenId, props.address).send({from: props.contractor, gas: props.gas, gasPrice: props.gasPrice}).then(() => {
+            console.log(`Token ${ar.tokenId} Ownership transfered from ${props.contractor} to ${props.address}`)
+            done();
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it('Should confirm ownership transfer', (done) => {
+        AssetManagerContract.methods.tokenShares(ar.tokenId).call().then((sca) => {
+            console.log(sca);
+            try {
+                assert.equal(sca.owner, props.address);
+                assert.equal(sca.tokenId, ar.tokenId);
+                assert.equal(sca.name, ar.name);
+                assert.equal(sca.symbol, ar.symbol);
+                assert.equal(sca.totalSupply, ar.totalQuantity);
+                assert.equal(sca.issuingPrice, ar.price);
+                assert.notEqual(sca.sharesContract, "0x0000000000000000000000000000000000000000");
+                done();
+            } catch (e) {
+                done(e);
+            }
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it('Should not transfer token you do not own', (done) => {
+        AssetManagerContract.methods.transferTokenOwnership(ar.tokenId, props.address).send({from: props.contractor, gas: props.gas, gasPrice: props.gasPrice}).then(() => {
+            console.log(`Token ${ar.tokenId} Ownership transfered from ${props.contractor} to ${props.address}`)
+            done();
+        }, (error) => {
+            try {
+                assert.isFalse(error === undefined);
+                assert.isNotNull(error);
+                done();
+            } catch (e) {
+                done(e);
+            }
+        });
+    }).timeout(TIMEOUT);
 });
 
 describe('Asset Manager V2 Asset Transfer Tests', () => {
@@ -140,10 +185,12 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
     });
 
     it(`Should transfer asset from issuer to ${props.user1.address}`, (done) => {
-        AssetManagerContract.methods.transferShares(ar.tokenId, props.user1.address, toTransfer).send({ from: issuer }).then(() => {
+        AssetManagerContract.methods.transferShares(ar.tokenId, props.user1.address, toTransfer).send({ from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user1OwnedShares += toTransfer;
             issuerBalance -= toTransfer;
             done();
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -156,6 +203,8 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -168,14 +217,18 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
     it(`Should transfer asset from issuer to ${props.user2.address}`, (done) => {
-        AssetManagerContract.methods.transferShares(ar.tokenId, props.user2.address, toTransfer2).send({ from: issuer }).then(() => {
+        AssetManagerContract.methods.transferShares(ar.tokenId, props.user2.address, toTransfer2).send({ from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user2OwnedShares += toTransfer2
             issuerBalance -= toTransfer2;
             done();
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -188,6 +241,8 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -200,14 +255,18 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
     it(`Should transfer asset from ${props.user1.address} to ${props.user2.address}`, (done) => {
-        AssetManagerContract.methods.transferShares(ar.tokenId, props.user2.address, toTransfer3).send({ from: props.user1.address }).then(() => {
+        AssetManagerContract.methods.transferShares(ar.tokenId, props.user2.address, toTransfer3).send({ from: props.user1.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user1OwnedShares -= toTransfer3;
             user2OwnedShares += toTransfer3;
             done();
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -220,6 +279,8 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -232,14 +293,18 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
     it(`Should transfer asset from ${props.user2.address} to ${props.user1.address}`, (done) => {
-        AssetManagerContract.methods.transferShares(ar.tokenId, props.user1.address, toTransfer3).send({ from: props.user2.address }).then(() => {
+        AssetManagerContract.methods.transferShares(ar.tokenId, props.user1.address, toTransfer3).send({ from: props.user2.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user1OwnedShares += toTransfer3;
             user2OwnedShares -= toTransfer3;
             done();
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -252,6 +317,8 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -264,6 +331,8 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 });
@@ -276,14 +345,16 @@ describe('Asset Manager V2 Wallet Funding Tests', () => {
     });
 
     it(`Should Fund ${props.user1.address}`, (done) => {
-        AssetManagerContract.methods.fundWallet(props.user1.address, toTransfer).send({ from: props.contractor }).then(() => {
+        AssetManagerContract.methods.fundWallet(props.user1.address, toTransfer).send({ from: props.contractor, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user1WalletBalance += toTransfer;
             done();
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
     it(`Should not fund ${props.user2.address} from ${props.user1.address} (only contractor can fund wallets)`, (done) => {
-        AssetManagerContract.methods.fundWallet(props.user1.address, toTransfer).send({ from: props.user1.address }).then(() => {
+        AssetManagerContract.methods.fundWallet(props.user1.address, toTransfer).send({ from: props.user1.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             done();
         }, error => {
             try {
@@ -297,9 +368,11 @@ describe('Asset Manager V2 Wallet Funding Tests', () => {
     }).timeout(TIMEOUT);
 
     it(`Should Fund ${props.user2.address}`, (done) => {
-        AssetManagerContract.methods.fundWallet(props.user2.address, toTransfer).send({ from: props.contractor }).then(() => {
+        AssetManagerContract.methods.fundWallet(props.user2.address, toTransfer).send({ from: props.contractor, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user2WalletBalance += toTransfer;
             done();
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -313,6 +386,8 @@ describe('Asset Manager V2 Wallet Funding Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -326,6 +401,8 @@ describe('Asset Manager V2 Wallet Funding Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 });
@@ -343,13 +420,15 @@ describe('Asset Manager V2 Buy Tests', () => {
     /** User 1 to User 2 */
     // -----------------------------------------------
     it(`Should use ${props.user1.address} to buy asset from ${props.user2.address}`, (done) => {
-        AssetManagerContract.methods.buyShares(ar.tokenId, props.user2.address, shares, price).send({ from: props.user1.address }).then(() => {
+        AssetManagerContract.methods.buyShares(ar.tokenId, props.user2.address, shares, price).send({ from: props.user1.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user1OwnedShares += shares;
             user1WalletBalance -= cost;
             user2OwnedShares -= shares;
             user2WalletBalance += cost;
             done();
-        })
+        }, (error) => {
+            done(error);
+        });
     }).timeout(TIMEOUT);
 
     it(`Should make sure ${props.user1.address} asset balance increased`, (done) => {
@@ -361,6 +440,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -373,6 +454,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -385,6 +468,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -397,6 +482,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
     // -----------------------------------------------
@@ -405,13 +492,15 @@ describe('Asset Manager V2 Buy Tests', () => {
     // -----------------------------------------------
 
     it(`Should use ${props.user2.address} to buy asset from ${props.user1.address}`, (done) => {
-        AssetManagerContract.methods.buyShares(ar.tokenId, props.user1.address, shares, price).send({ from: props.user2.address }).then(() => {
+        AssetManagerContract.methods.buyShares(ar.tokenId, props.user1.address, shares, price).send({ from: props.user2.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user2OwnedShares += shares;
             user2WalletBalance -= cost;
             user1OwnedShares -= shares;
             user1WalletBalance += cost;
             done();
-        })
+        }, (error) => {
+            done(error);
+        });
     }).timeout(TIMEOUT);
 
     it(`Should make sure ${props.user2.address} asset balance increased`, (done) => {
@@ -423,6 +512,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -435,6 +526,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -447,6 +540,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -459,6 +554,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);    
     // -----------------------------------------------
@@ -467,13 +564,15 @@ describe('Asset Manager V2 Buy Tests', () => {
     // -----------------------------------------------
 
     it(`Should use ${props.user1.address} to buy asset from issuer}`, (done) => {
-        AssetManagerContract.methods.buyShares(ar.tokenId, issuer, shares, price).send({ from: props.user1.address }).then(() => {
+        AssetManagerContract.methods.buyShares(ar.tokenId, issuer, shares, price).send({ from: props.user1.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             user1OwnedShares += shares;
             user1WalletBalance -= cost;
             issuerBalance -= shares;
             issuerWalletBalance += cost;
             done();
-        })
+        }, (error) => {
+            done(error);
+        });
     }).timeout(TIMEOUT);
 
     it(`Should make sure ${props.user1.address} asset balance increased`, (done) => {
@@ -485,6 +584,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -497,6 +598,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -510,6 +613,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -522,6 +627,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
     
@@ -531,7 +638,7 @@ describe('Asset Manager V2 Buy Tests', () => {
     // -----------------------------------------------
 
     it(`Should use issuer to buy asset from ${props.user1.address}`, (done) => {
-        AssetManagerContract.methods.buyShares(ar.tokenId, props.user1.address, shares, price).send({ from: issuer }).then(() => {
+        AssetManagerContract.methods.buyShares(ar.tokenId, props.user1.address, shares, price).send({ from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             issuerBalance += shares;
             issuerWalletBalance -= cost;            
             user1OwnedShares -= shares;
@@ -540,7 +647,9 @@ describe('Asset Manager V2 Buy Tests', () => {
         }, error => {
             console.log(error);
             done(error);
-        })
+        }, (error) => {
+            done(error);
+        });
     }).timeout(TIMEOUT);
 
     it(`Should make sure ${props.user1.address} asset balance decreased`, (done) => {
@@ -552,6 +661,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -564,6 +675,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -576,6 +689,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);
 
@@ -588,6 +703,8 @@ describe('Asset Manager V2 Buy Tests', () => {
             } catch (e) {
                 done(e);
             }
+        }, (error) => {
+            done(error);
         });
     }).timeout(TIMEOUT);    
 });

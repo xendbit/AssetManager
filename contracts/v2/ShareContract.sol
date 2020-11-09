@@ -26,7 +26,7 @@ contract ShareContract is ERC20 {
         _approve(owner, assetManagerV2, amount.add(currentBalance));
     }
 
-    function details(uint256 tokenId) public view returns (address, uint256, string memory, string memory, uint256, uint256) {
-        return (address(this), tokenId, name(), symbol(), totalSupply(), issuingPrice());
+    function details() public view returns (address, string memory, string memory, uint256, uint256) {
+        return (address(this), name(), symbol(), totalSupply(), issuingPrice());
     }
 }

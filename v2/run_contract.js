@@ -9,10 +9,10 @@ const abiPath = props.v2.abiPath;
 const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
 
-const erc20ContractAddress = props.v2.erc20ContractAddress;
-const ercAbiPath = props.v2.erc20AbiPath;
-const erc20Abi = JSON.parse(fs.readFileSync(path.resolve(ercAbiPath), 'utf8'));
-const ERC20Contract = new web3.eth.Contract(erc20Abi.abi, erc20ContractAddress);
+// const erc20ContractAddress = props.v2.erc20ContractAddress;
+// const ercAbiPath = props.v2.erc20AbiPath;
+// const erc20Abi = JSON.parse(fs.readFileSync(path.resolve(ercAbiPath), 'utf8'));
+// const ERC20Contract = new web3.eth.Contract(erc20Abi.abi, erc20ContractAddress);
 
 async function erc20Methods() {
     console.log(ERC20Contract.methods);
@@ -48,7 +48,8 @@ async function mint(tokenId, name, symbol, totalQuantity, price) {
         name: name,        
         symbol: symbol,
         totalQuantity: totalQuantity,
-        price: price
+        price: price,
+        issuer: props.address
     }
 
 
@@ -95,10 +96,12 @@ async function buyShares(tokenId, seller, amount, price) {
 }
 
 async function sharesContractDetails(tokenId) {
-    let sca = await AssetManagerContract.methods.sharesContract(tokenId).call();
+    let sca = await AssetManagerContract.methods.tokenShares(tokenId).call();
     console.log(sca);
-    console.log(sca[0]);
-    console.log(sca['0']);
+}
+
+async function transferToken(tokenId, recipient) {
+    await AssetManagerContract.methods.transferTokenOwnership(tokenId, recipient).send({from: props.contractor});
 }
 
 //erc20Methods();
@@ -110,6 +113,8 @@ async function run() {
     await sharesContractDetails(tokenId);
     await ownedShares(tokenId, props.address);
     await walletBalance(props.address);
+    await transferToken(tokenId, props.address);
+    await sharesContractDetails(tokenId);
     // await fundWallet(props.user2.address, 125400);
     // await transferShares(tokenId, props.user2.address, 25700);
     // await ownedShares(tokenId, props.user2.address);
