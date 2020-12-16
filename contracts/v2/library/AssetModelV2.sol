@@ -22,6 +22,12 @@ library AssetModelV2 {
         uint256 issuingPrice;
     }
 
+    struct UserShares {
+        uint256 tokenId;
+        address owner;
+        uint256 amountOwned;
+    }
+
     function validateAsset(AssetRequest memory asset) public pure {
         bytes memory b = bytes(asset.name);
         bytes memory b1 = bytes(asset.symbol);

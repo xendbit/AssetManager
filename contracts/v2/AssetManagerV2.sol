@@ -5,57 +5,93 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./ShareContract.sol";
 import "./library/AssetModelV2.sol";
+import "./library/OrderModelV2.sol";
 
-contract AssetManagerV2 is ERC721('NSE Art Exchange', 'ARTX') {
+contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     event DEBUG(address str);
+    event DEBUG(uint256 str);
     event DEBUG(string str);
 
-    mapping (uint256 => ShareContract) shares;
+    mapping(uint256 => ShareContract) shares;
 
     ShareContract wallet;
+
+    // Store All Orders. Key is OrderModel.Order Key
+    mapping(bytes32 => OrderModelV2.Order) orders;
+
+    // Store All Orders. Key is hash of keys
+    mapping(bytes32 => OrderModelV2.SortedKey[]) filtered;
+    mapping(address => OrderModelV2.SortedKey[]) userOrders;
 
     address owner;
 
     constructor() public {
-        owner = msg.sender;        
-        wallet = new ShareContract('Tether Token 1-1 with local currency', 'WALLET', 2**250, 1, msg.sender);
-        emit DEBUG("Wallet Address");
-        emit DEBUG(address(wallet));
+        owner = msg.sender;
+        wallet = new ShareContract(
+            "Tether Token",
+            "WALLET",
+            2**250,
+            1,
+            msg.sender
+        );        
     }
+
+    function postOrder(OrderModelV2.OrderRequest memory or) external {}
 
     function mint(AssetModelV2.AssetRequest memory ar) external {
         AssetModelV2.validateAsset(ar);
-        require(owner == msg.sender);        
+        require(owner == msg.sender);
         _safeMint(msg.sender, ar.tokenId);
         // create an ERC20 Smart contract and assign the shares to issuer
-        ShareContract shareContract = new ShareContract(ar.name, ar.symbol, ar.totalQuantity, ar.price, ar.issuer);
+        ShareContract shareContract = new ShareContract(
+            ar.name,
+            ar.symbol,
+            ar.totalQuantity,
+            ar.price,
+            ar.issuer
+        );
         shares[ar.tokenId] = shareContract;
     }
 
-    function ownedShares(uint256 tokenId, address userAddress) external view returns(uint256) {
+    function ownedShares(uint256 tokenId, address userAddress)
+        external
+        view
+        returns (uint256)
+    {
         ShareContract shareContract = shares[tokenId];
         return shareContract.allowance(userAddress, address(this));
     }
 
-    function transferShares(uint256 tokenId, address recipient, uint256 amount) external {
-        ShareContract shareContract = shares[tokenId];
-        shareContract.transferFrom(msg.sender, recipient, amount);      
-        // Allow this contract to spend on recipients behalf  
-        shareContract.allow(recipient, amount);
+    function transferShares(
+        uint256 tokenId,
+        address recipient,
+        uint256 amount
+    ) external {
+        shares[tokenId].transferFrom(msg.sender, recipient, amount);
+        // Allow this contract to spend on recipients behalf
+        shares[tokenId].allow(recipient, amount);
     }
 
-    function transferTokenOwnership(uint256 tokenId, address recipient) external {
-        ShareContract shareContract = shares[tokenId];
-        uint256 sharesOwned = shareContract.allowance(msg.sender, address(this));
+    function transferTokenOwnership(uint256 tokenId, address recipient)
+        external
+    {
+        uint256 sharesOwned = shares[tokenId].allowance(
+            msg.sender,
+            address(this)
+        );
 
         // first transfer the shares owned by the caller in tokenId
-        shareContract.transferFrom(msg.sender, recipient, sharesOwned);      
-        shareContract.allow(recipient, sharesOwned);
+        shares[tokenId].transferFrom(msg.sender, recipient, sharesOwned);
+        shares[tokenId].allow(recipient, sharesOwned);
         // then transfer ownership of the token
-        safeTransferFrom(msg.sender, recipient, tokenId);        
+        safeTransferFrom(msg.sender, recipient, tokenId);
     }
-    
-    function walletBalance(address userAddress) external view returns(uint256) {
+
+    function walletBalance(address userAddress)
+        external
+        view
+        returns (uint256)
+    {
         return wallet.allowance(userAddress, address(this));
     }
 
@@ -71,8 +107,13 @@ contract AssetManagerV2 is ERC721('NSE Art Exchange', 'ARTX') {
         Buyer transfers amount * price to seller from wallet
         Seller transfers amount to buyer from shares
      */
-    function buyShares(uint256 tokenId, address seller, uint256 amount, uint256 price) external {
-        address buyer = msg.sender;        
+    function buyShares(
+        uint256 tokenId,
+        address seller,
+        uint256 amount,
+        uint256 price
+    ) external {
+        address buyer = msg.sender;
         wallet.transferFrom(buyer, seller, amount.mul(price));
         // Allow this contract to spend on seller's behalf
         wallet.allow(seller, amount.mul(price));
@@ -83,18 +124,29 @@ contract AssetManagerV2 is ERC721('NSE Art Exchange', 'ARTX') {
         shareContract.allow(buyer, amount);
     }
 
-    function tokenShares(uint256 tokenId) external view returns (AssetModelV2.TokenShares memory) {        
+    function tokenShares(uint256 tokenId)
+        external
+        view
+        returns (AssetModelV2.TokenShares memory)
+    {
         address tokenOwner = ownerOf(tokenId);
         ShareContract shareContract = shares[tokenId];
-        (address sharesContract, string memory name, string memory symbol, uint256 totalSupply, uint256 issuingPrice) = shareContract.details();
-        return AssetModelV2.TokenShares({
-            tokenId: tokenId,
-            owner: tokenOwner,
-            sharesContract: sharesContract,
-            name: name,
-            symbol: symbol,            
-            totalSupply: totalSupply,
-            issuingPrice: issuingPrice
-        });
+        (
+            address sharesContract,
+            string memory name,
+            string memory symbol,
+            uint256 totalSupply,
+            uint256 issuingPrice
+        ) = shareContract.details();
+        return
+            AssetModelV2.TokenShares({
+                tokenId: tokenId,
+                owner: tokenOwner,
+                sharesContract: sharesContract,
+                name: name,
+                symbol: symbol,
+                totalSupply: totalSupply,
+                issuingPrice: issuingPrice
+            });
     }
 }

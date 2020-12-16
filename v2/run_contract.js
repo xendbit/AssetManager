@@ -14,6 +14,18 @@ const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
 // const erc20Abi = JSON.parse(fs.readFileSync(path.resolve(ercAbiPath), 'utf8'));
 // const ERC20Contract = new web3.eth.Contract(erc20Abi.abi, erc20ContractAddress);
 
+const OrderType = {
+    BUY: 0,
+    SELL: 1,
+}
+const OrderStrategy = {
+    GTC: 0,
+    AON: 1,
+    GTD: 2,
+    GTM: 3,
+    MO: 4,
+}
+
 async function erc20Methods() {
     console.log(ERC20Contract.methods);
     console.log(await ERC20Contract.methods.totalSupply().call({ from: props.address }));
@@ -104,17 +116,53 @@ async function transferToken(tokenId, recipient) {
     await AssetManagerContract.methods.transferTokenOwnership(tokenId, recipient).send({from: props.contractor});
 }
 
+async function postOrder(tokenId, orderType, orderStrategy, amount, price, goodUntil) {
+    let value = 0;
+    if (orderType === 0) {
+        // we must send ether to the smart contract worth how much we are willing to pay
+        value = amount * price;
+    }
+
+    const key = Utils.soliditySha3(
+        { type: 'uint256', value: amount },
+        { type: 'uint256', value: price },
+        { type: 'uint256', value: tokenId },
+        { type: 'uint256', value: new Date().getTime() }
+    );
+
+    console.log('KEY: ', key);
+
+    orderRequest = {
+        orderType: orderType,
+        orderStrategy: orderStrategy,
+        amount: amount,
+        price: price,
+        tokenId: tokenId,
+        goodUntil: goodUntil,
+        key: key
+    };
+
+    console.log(orderRequest);
+
+    await web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm');
+    await AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value });
+}
+
 //erc20Methods();
 //processEvents();
 //showMethods();
-async function run() {
+async function run() {    
     const tokenId = Math.floor(Math.random() * 100000000);
+    //await postOrder(tokenId, OrderType.BUY, OrderStrategy.GTC, 1700, 1, 0);
+    let start = new Date().getTime();
     await mint(tokenId, 'Test Asset', 'TAX', 1000000, 10);
+    let end = new Date().getTime();
+    console.log(end - start);
     await sharesContractDetails(tokenId);
-    await ownedShares(tokenId, props.address);
-    await walletBalance(props.address);
-    await transferToken(tokenId, props.address);
-    await sharesContractDetails(tokenId);
+    // await ownedShares(tokenId, props.address);
+    // await walletBalance(props.address);
+    // await transferToken(tokenId, props.address);
+    // await sharesContractDetails(tokenId);
     // await fundWallet(props.user2.address, 125400);
     // await transferShares(tokenId, props.user2.address, 25700);
     // await ownedShares(tokenId, props.user2.address);
