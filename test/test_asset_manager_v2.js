@@ -9,7 +9,7 @@ const abi = JSON.parse(fs.readFileSync(path.resolve(abiPath), 'utf8'));
 const AssetManagerContract = new web3.eth.Contract(abi.abi, contractAddress);
 const TIMEOUT = 60000;
 const { assert } = require('chai');
-const { unlockAccounts } = require('./test_utils.js');
+const { unlockAccounts, getOrderRequestV2, OrderType, OrderStrategy } = require('./test_utils.js');
 
 const ar = {
     tokenId: Math.floor(Math.random() * 100000000),
@@ -17,7 +17,7 @@ const ar = {
     symbol: 'TAX',
     totalQuantity: 1000000,
     price: 10,
-    issuer: props.address
+    issuer: props.issuer
 };
 
 const ar2 = {
@@ -26,10 +26,10 @@ const ar2 = {
     symbol: 'TAX',
     totalQuantity: 1000000,
     price: 10,
-    issuer: props.address
+    issuer: props.issuer
 };
 
-const issuer = props.address;
+const issuer = props.issuer;
 let issuerBalance = 0;
 let issuerWalletBalance = 0;
 
@@ -38,6 +38,8 @@ let user2WalletBalance = 0;
 
 let user1OwnedShares = 0;
 let user2OwnedShares = 0;
+
+let sellOrder1Key = "";
 
 describe('Asset Manager V2 Minting Test', () => {
     before(function (done) {
@@ -70,7 +72,7 @@ describe('Asset Manager V2 Minting Test', () => {
     }).timeout(TIMEOUT);
 
     it('Should not mint a new token (minter must be contractor)', (done) => {
-        AssetManagerContract.methods.mint(ar2).send({ from: props.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+        AssetManagerContract.methods.mint(ar2).send({ from: props.issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             done();
         }, (error) => {
             try {
@@ -125,13 +127,16 @@ describe('Asset Manager V2 Minting Test', () => {
                 });
             });
         });
-    }).timeout(TIMEOUT);    
+    }).timeout(TIMEOUT);
 });
 
+// NOTE: When Minting is done, the token belongs to the minter - i.e the contractor...creator of contract.
+// Before trading can start, you need to transfer the token to the issuer
+
 describe('Asset Manager Token Transfer Tests', () => {
-    it('Should transfer token ownership', (done) => {
-        AssetManagerContract.methods.transferTokenOwnership(ar.tokenId, props.address).send({from: props.contractor, gas: props.gas, gasPrice: props.gasPrice}).then(() => {
-            console.log(`Token ${ar.tokenId} Ownership transfered from ${props.contractor} to ${props.address}`)
+    it('Should transfer token ownership from contractor to issuer', (done) => {
+        AssetManagerContract.methods.transferTokenOwnership(ar.tokenId, props.issuer).send({ from: props.contractor, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log(`Token ${ar.tokenId} Ownership transfered from ${props.contractor} to ${props.issuer}`)
             done();
         }, (error) => {
             done(error);
@@ -142,7 +147,7 @@ describe('Asset Manager Token Transfer Tests', () => {
         AssetManagerContract.methods.tokenShares(ar.tokenId).call().then((sca) => {
             console.log(sca);
             try {
-                assert.equal(sca.owner, props.address);
+                assert.equal(sca.owner, props.issuer);
                 assert.equal(sca.tokenId, ar.tokenId);
                 assert.equal(sca.name, ar.name);
                 assert.equal(sca.symbol, ar.symbol);
@@ -159,8 +164,8 @@ describe('Asset Manager Token Transfer Tests', () => {
     }).timeout(TIMEOUT);
 
     it('Should not transfer token you do not own', (done) => {
-        AssetManagerContract.methods.transferTokenOwnership(ar.tokenId, props.address).send({from: props.contractor, gas: props.gas, gasPrice: props.gasPrice}).then(() => {
-            console.log(`Token ${ar.tokenId} Ownership transfered from ${props.contractor} to ${props.address}`)
+        AssetManagerContract.methods.transferTokenOwnership(ar.tokenId, props.issuer).send({ from: props.contractor, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log(`Token ${ar.tokenId} Ownership transfered from ${props.contractor} to ${props.issuer}`)
             done();
         }, (error) => {
             try {
@@ -174,7 +179,36 @@ describe('Asset Manager Token Transfer Tests', () => {
     }).timeout(TIMEOUT);
 });
 
-describe('Asset Manager V2 Asset Transfer Tests', () => {
+describe('Asset Manager V2 Order Management Tests', () => {
+    before(function (done) {
+        this.timeout(TIMEOUT);
+        unlockAccounts(done);
+    });
+
+    it(`It should post a new sell order from ${issuer}`, (done) => {
+        const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.SELL, OrderStrategy.GTC, 1500, 1, 0);
+        console.log(orderRequest);
+        sellOrder1Key = orderRequest.key;
+        AssetManagerContract.methods.postOrder(orderRequest).send({from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log("Order Posted");
+            done();
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it(`Should confirm order is successfully posted`, (done) => {
+        console.log(sellOrder1Key);
+        AssetManagerContract.methods.getOrder(sellOrder1Key).call({from: props.address}).then((order) => {
+            console.log(order);
+            done();
+        }, error => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+});
+
+describe.skip('Asset Manager V2 Asset Transfer Tests', () => {
     const toTransfer = 50000;
     const toTransfer2 = 25000
     const toTransfer3 = 12500;
@@ -337,7 +371,7 @@ describe('Asset Manager V2 Asset Transfer Tests', () => {
     }).timeout(TIMEOUT);
 });
 
-describe('Asset Manager V2 Wallet Funding Tests', () => {
+describe.skip('Asset Manager V2 Wallet Funding Tests', () => {
     const toTransfer = 50000;
     before(function (done) {
         this.timeout(TIMEOUT);
@@ -407,7 +441,7 @@ describe('Asset Manager V2 Wallet Funding Tests', () => {
     }).timeout(TIMEOUT);
 });
 
-describe('Asset Manager V2 Buy Tests', () => {
+describe.skip('Asset Manager V2 Buy Tests', () => {
     const shares = 200;
     const price = 10;
     const cost = shares * price;
@@ -557,7 +591,7 @@ describe('Asset Manager V2 Buy Tests', () => {
         }, (error) => {
             done(error);
         });
-    }).timeout(TIMEOUT);    
+    }).timeout(TIMEOUT);
     // -----------------------------------------------
 
     /** User 1 to  Issuer */
@@ -631,7 +665,7 @@ describe('Asset Manager V2 Buy Tests', () => {
             done(error);
         });
     }).timeout(TIMEOUT);
-    
+
     // -----------------------------------------------
 
     /** Issuer to  User 1 */
@@ -640,7 +674,7 @@ describe('Asset Manager V2 Buy Tests', () => {
     it(`Should use issuer to buy asset from ${props.user1.address}`, (done) => {
         AssetManagerContract.methods.buyShares(ar.tokenId, props.user1.address, shares, price).send({ from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             issuerBalance += shares;
-            issuerWalletBalance -= cost;            
+            issuerWalletBalance -= cost;
             user1OwnedShares -= shares;
             user1WalletBalance += cost;
             done();
@@ -706,5 +740,5 @@ describe('Asset Manager V2 Buy Tests', () => {
         }, (error) => {
             done(error);
         });
-    }).timeout(TIMEOUT);    
+    }).timeout(TIMEOUT);
 });

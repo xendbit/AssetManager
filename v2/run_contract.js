@@ -1,4 +1,5 @@
 const Web3 = require('web3');
+const getRevertReason = require('eth-revert-reason')
 const props = require('../config/config');
 const path = require('path');
 const fs = require('fs');
@@ -47,6 +48,7 @@ function processEvents() {
             for (e of events) {
                 console.error(e.event);
                 if (e.event === 'DEBUG') {
+                    console.error(e);
                     console.error(e.returnValues['str']);
                 }
             }
@@ -76,8 +78,17 @@ async function mint(tokenId, name, symbol, totalQuantity, price) {
     console.log(assetRequest);
 
     await web3.eth.personal.unlockAccount(props.contractor, 'Wq017kmg@tm');
+    console.log("Account Unlocked");
     await AssetManagerContract.methods.mint(assetRequest).send({ from: props.contractor });
     console.log('Asset Minted');
+    await AssetManagerContract.methods.transferShares(tokenId, props.address, totalQuantity).send({ from: props.contractor });
+    console.log('Token Shares Transafered');
+}
+
+async function tokenShares(tokenId) {
+    const ts = await AssetManagerContract.methods.tokenShares(tokenId).call();
+    console.log(`Token Shares`);
+    console.log(ts);
 }
 
 async function ownedShares(tokenId, userAddress) {
@@ -146,19 +157,28 @@ async function postOrder(tokenId, orderType, orderStrategy, amount, price, goodU
 
     await web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm');
     await AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.address, value: value });
+    return key;
+}
+
+async function getOrder(key) {
+    let order = await AssetManagerContract.methods.getOrder(key).call({from: props.address});
+    console.log(order);
 }
 
 //erc20Methods();
-//processEvents();
+processEvents();
 //showMethods();
 async function run() {    
-    const tokenId = Math.floor(Math.random() * 100000000);
-    //await postOrder(tokenId, OrderType.BUY, OrderStrategy.GTC, 1700, 1, 0);
-    let start = new Date().getTime();
-    await mint(tokenId, 'Test Asset', 'TAX', 1000000, 10);
-    let end = new Date().getTime();
-    console.log(end - start);
-    await sharesContractDetails(tokenId);
+    // const tokenId = Math.floor(Math.random() * 100000000);
+    // console.log(tokenId);
+    // await mint(tokenId, 'Test Asset', 'TAX', 1000000, 10);    
+    // await tokenShares(tokenId);
+    // await walletBalance(props.contractor);
+    // await ownedShares(tokenId, props.contractor);
+    // await ownedShares(tokenId, props.contractAddress);
+    //let key = await postOrder(tokenId, OrderType.BUY, OrderStrategy.GTC, 1700, 1, 0);        
+    //await getOrder(key);
+    //await sharesContractDetails(tokenId);
     // await ownedShares(tokenId, props.address);
     // await walletBalance(props.address);
     // await transferToken(tokenId, props.address);

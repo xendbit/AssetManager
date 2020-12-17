@@ -99,6 +99,29 @@ function getOrderRequest(orderType, orderStrategy, amount, price, assetName, ass
     }
 }
 
+function getOrderRequestV2(tokenId, orderType, orderStrategy, amount, price, goodUntil) {
+    const key = Utils.soliditySha3(
+        { type: 'uint256', value: amount },
+        { type: 'uint256', value: price },
+        { type: 'uint256', value: tokenId },
+        { type: 'uint256', value: new Date().getTime() }
+    );
+
+    console.log('KEY: ', key);
+
+    orderRequest = {
+        orderType: orderType,
+        orderStrategy: orderStrategy,
+        amount: amount,
+        price: price,
+        tokenId: tokenId,
+        goodUntil: goodUntil,
+        key: key
+    };
+
+    return orderRequest;
+}
+
 function unlockAccounts(done) {
     web3.eth.personal.unlockAccount(props.address, 'Wq017kmg@tm').then(() => {
         console.log(`unlocked ${props.address}`);
@@ -116,7 +139,7 @@ function unlockAccounts(done) {
 }
 
 module.exports = {
-    getOrderRequest,
+    getOrderRequestV2,
     testAsset,
     testOrder,
     getFilteredOrders,

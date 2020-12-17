@@ -6,11 +6,15 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./ShareContract.sol";
 import "./library/AssetModelV2.sol";
 import "./library/OrderModelV2.sol";
+import "../library/Constants.sol";
 
 contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     event DEBUG(address str);
     event DEBUG(uint256 str);
     event DEBUG(string str);
+    event OrderPosted(OrderModelV2.Order order);
+    event OrderBought(OrderModelV2.Order order);
+    event OrderSold(OrderModelV2.Order order);
 
     mapping(uint256 => ShareContract) shares;
 
@@ -25,6 +29,9 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
 
     address owner;
 
+    // store xether that is tied down by a buy order, key is address
+    mapping(address => uint256) escrow;
+
     constructor() public {
         owner = msg.sender;
         wallet = new ShareContract(
@@ -33,10 +40,93 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
             2**250,
             1,
             msg.sender
-        );        
+        );
     }
 
-    function postOrder(OrderModelV2.OrderRequest memory or) external {}
+    function walletBalance(address userAddress)
+        external
+        view
+        returns (uint256)
+    {
+        return wallet.allowance(userAddress, address(this));
+    }
+
+    function ownedShares(uint256 tokenId, address userAddress)
+        external
+        view
+        returns (uint256)
+    {
+        ShareContract shareContract = shares[tokenId];
+        return shareContract.allowance(userAddress, address(this));
+    }
+
+    function postOrder(OrderModelV2.OrderRequest memory or) external {
+        OrderModelV2.validateOrder(or);
+
+        address seller;
+        address buyer;
+        if (or.orderType == OrderModelV2.OrderType.BUY) {
+            buyer = msg.sender;
+            seller = address(0);            
+            uint256 totalCost = or.amount.mul(or.price);
+            uint256 buyerNgncBalance = wallet.allowance(buyer, address(this));
+
+            if (buyerNgncBalance >= totalCost) {
+                // deduct totalCost from wallet
+                _updateWalletBalance(buyer, totalCost, false);
+                // update escrow
+                escrow[buyer] = escrow[buyer].add(totalCost);
+            } else {
+                revert("Low Balance");
+            }
+        } else if (or.orderType == OrderModelV2.OrderType.SELL) {
+            buyer = address(0);
+            seller = msg.sender;
+            //check that you have the asset you want to sell
+            ShareContract shareContract = shares[or.tokenId];
+            uint256 sellerShares = shareContract.allowance(seller, address(this));
+            if (sellerShares < or.amount) {
+                revert("You don't have enough shares for this transaction");
+            }
+        }
+
+        OrderModelV2.SortedKey memory sortedKey = OrderModelV2.SortedKey({
+            key: or.key,
+            date: block.timestamp
+        });
+
+        OrderModelV2.Order memory dbOrder = OrderModelV2.Order({
+            key: sortedKey,
+            orderType: or.orderType,
+            orderStrategy: or.orderStrategy,
+            seller: seller,
+            buyer: buyer,
+            tokenId: or.tokenId,
+            amountRemaining: or.amount,
+            originalAmount: or.amount,
+            price: or.price,
+            status: OrderModelV2.OrderStatus.NEW,
+            orderDate: block.timestamp,
+            statusDate: block.timestamp,
+            goodUntil: or.goodUntil
+        });
+
+        orders[or.key] = dbOrder;
+
+        _populateFilteredOrders(
+            dbOrder.key,
+            dbOrder.orderType,
+            dbOrder.buyer,
+            dbOrder.seller
+        );
+
+        emit OrderPosted(dbOrder);
+        _matchOrder(dbOrder);
+    }
+
+    function getOrder(bytes32 key) external view returns (OrderModelV2.Order memory) {    
+        return orders[key];
+    }
 
     function mint(AssetModelV2.AssetRequest memory ar) external {
         AssetModelV2.validateAsset(ar);
@@ -51,15 +141,6 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
             ar.issuer
         );
         shares[ar.tokenId] = shareContract;
-    }
-
-    function ownedShares(uint256 tokenId, address userAddress)
-        external
-        view
-        returns (uint256)
-    {
-        ShareContract shareContract = shares[tokenId];
-        return shareContract.allowance(userAddress, address(this));
     }
 
     function transferShares(
@@ -85,14 +166,6 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         shares[tokenId].allow(recipient, sharesOwned);
         // then transfer ownership of the token
         safeTransferFrom(msg.sender, recipient, tokenId);
-    }
-
-    function walletBalance(address userAddress)
-        external
-        view
-        returns (uint256)
-    {
-        return wallet.allowance(userAddress, address(this));
     }
 
     function fundWallet(address recipient, uint256 amount) external {
@@ -149,4 +222,32 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                 issuingPrice: issuingPrice
             });
     }
+
+    function _updateWalletBalance(address recipient, uint256 amount, bool add) internal {
+        if (add) {
+            wallet.transferFrom(owner, recipient, amount);
+            // Allow this contract to spend on recipients behalf
+            wallet.allow(recipient, amount);
+        } else {
+            wallet.transferFrom(recipient, owner, amount);
+        }
+    }
+
+    function _populateFilteredOrders(
+        OrderModelV2.SortedKey memory key,
+        OrderModelV2.OrderType orderType,
+        address buyer,
+        address seller
+    ) internal {
+        filtered[Constants.PENDING_ORDERS_KEY].push(key);
+        if (orderType == OrderModelV2.OrderType.BUY) {
+            filtered[Constants.BUY_ORDERS_KEY].push(key);
+            userOrders[buyer].push(key);
+        } else {
+            filtered[Constants.SELL_ORDERS_KEY].push(key);
+            userOrders[seller].push(key);
+        }
+    }
+
+    function _matchOrder(OrderModelV2.Order memory matchingOrder) internal {}
 }

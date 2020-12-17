@@ -43,10 +43,10 @@ module.exports = {
     // options below to some value.
     //
     test: {
-      host: "https://lb.xendbit.net/geth",     // Localhost (default: none)
-      //port: 443,            // Standard Ethereum port (default: none)
+      host: "35.224.252.52",     // Localhost (default: none)
+      port: 8545,            // Standard Ethereum port (default: none)
       network_id: "1337",       // Any network (default: none)
-      from: "0x9e8e11b145403dc6cb3e002d90f0d715817ae323",
+      from: "0xC04915f6b3ff85b50A863eB1FcBF368171539413",
     },
     dev: {
       host: "127.0.0.1",     // Localhost (default: none)
