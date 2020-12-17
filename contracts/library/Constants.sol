@@ -3,6 +3,7 @@ pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 import { Math } from './Math.sol';
 import { OrderModel } from './OrderModel.sol';
+import { OrderModelV2 } from '../v2/library/OrderModelV2.sol';
 
 library Constants {
     bytes32 constant PENDING_ORDERS_KEY = keccak256(bytes("PENDING_ORDERS"));
@@ -21,20 +22,45 @@ library Constants {
         uint256 toSell;
     }
 
-    function binarySearch (OrderModel.SortedKey[] memory arr, int256 low, int256 high, OrderModel.SortedKey memory key) public pure returns (int256) { 
+    function binarySearch (
+        OrderModel.SortedKey[] memory arr,
+        int256 low,
+        int256 high,
+        OrderModel.SortedKey memory key) public pure returns (int256) {
         if (high < low) {
-            return -1; 
+            return -1;
         }
 
-        int256 mid = low + (high - low) / 2;//Math.div(Math.add(low, high), 2); 
+        int256 mid = low + (high - low) / 2;//Math.div(Math.add(low, high), 2);
         if (key.date == arr[uint256(mid)].date) {
-            return int256(mid); 
-        }
-        
-        if (key.date < arr[uint256(mid)].date) {
-            return binarySearch(arr, low, (mid - 1), key); 
+            return int256(mid);
         }
 
-        return binarySearch(arr, (mid + 1), high, key); 
-    }             
+        if (key.date < arr[uint256(mid)].date) {
+            return binarySearch(arr, low, (mid - 1), key);
+        }
+
+        return binarySearch(arr, (mid + 1), high, key);
+    }
+
+    function binarySearchV2 (
+        OrderModelV2.SortedKey[] memory arr,
+        int256 low,
+        int256 high,
+        OrderModelV2.SortedKey memory key) public pure returns (int256) {
+        if (high < low) {
+            return -1;
+        }
+
+        int256 mid = low + (high - low) / 2;//Math.div(Math.add(low, high), 2);
+        if (key.date == arr[uint256(mid)].date) {
+            return int256(mid);
+        }
+
+        if (key.date < arr[uint256(mid)].date) {
+            return binarySearchV2(arr, low, (mid - 1), key);
+        }
+
+        return binarySearchV2(arr, (mid + 1), high, key);
+    }
 }

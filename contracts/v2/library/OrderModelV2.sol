@@ -5,20 +5,20 @@ pragma experimental ABIEncoderV2;
 library OrderModelV2 {
     enum OrderType {BUY, SELL}
     enum OrderStrategy {
-        GOOD_TILL_CANCEL, 
-        ALL_OR_NONE, 
-        GOOD_TILL_DATE, 
-        GOOD_TILL_MONTH, 
+        GOOD_TILL_CANCEL,
+        ALL_OR_NONE,
+        GOOD_TILL_DATE,
+        GOOD_TILL_MONTH,
         MARKET_ORDER
     }
-    
+
     enum OrderStatus {
-        NEW, 
-        MATCHED, 
-        DELETED, 
+        NEW,
+        MATCHED,
+        DELETED,
         EXPIRED
     }
-    
+
     struct SortedKey {
         bytes32 key;
         uint256 date;
