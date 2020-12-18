@@ -117,8 +117,8 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         ShareContract shareContract = new ShareContract(
             ar.name,
             ar.symbol,
-            ar.totalQuantity,
-            ar.price,
+            ar.totalSupply,
+            ar.issuingPrice,
             ar.issuer
         );
         shares[ar.tokenId] = shareContract;
@@ -169,8 +169,10 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
             string memory name,
             string memory symbol,
             uint256 totalSupply,
-            uint256 issuingPrice
+            uint256 issuingPrice,
+            address issuer
         ) = shareContract.details();
+
         return AssetModelV2.TokenShares({
                 tokenId: tokenId,
                 owner: tokenOwner,
@@ -178,7 +180,8 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                 name: name,
                 symbol: symbol,
                 totalSupply: totalSupply,
-                issuingPrice: issuingPrice
+                issuingPrice: issuingPrice,
+                issuer: issuer
             });
     }
 

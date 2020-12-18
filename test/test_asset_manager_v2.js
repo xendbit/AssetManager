@@ -15,8 +15,8 @@ const ar = {
     tokenId: Math.floor(Math.random() * 100000000),
     name: 'Test Asset',
     symbol: 'TAX',
-    totalQuantity: 1000000,
-    price: 10,
+    totalSupply: 1000000,
+    issuingPrice: 10,
     issuer: props.issuer
 };
 
@@ -24,8 +24,8 @@ const ar2 = {
     name: 'Test Asset',
     tokenId: Math.floor(Math.random() * 100000000),
     symbol: 'TAX',
-    totalQuantity: 1000000,
-    price: 10,
+    totalSupply: 1000000,
+    issuingPrice: 10,
     issuer: props.issuer
 };
 
@@ -259,13 +259,212 @@ describe('Asset Manager V2 Wallet Funding Tests', () => {
 });
 
 // Order Book Management
-describe('Asset Manager V2 Order Book Management Tests', () => {
+describe('Asset Manager V2 Order Book Management Tests: ALL OR NOTHING Orders', () => {
     before(function (done) {
         this.timeout(TIMEOUT);
         unlockAccounts(done);
     });
 
-    it(`It should post a new GOOD_TILL_CANCEL Sell Order from ${issuer}`, (done) => {
+    // #1 Sell
+    it(`It should post a New Sell Order from ${issuer}`, (done) => {
+        const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.SELL, OrderStrategy.AON, 1500, 1, 0);
+        sellOrder1Key = orderRequest.key;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log("Order Posted");
+            done();
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it(`Should confirm order is successfully posted`, (done) => {
+        AssetManagerContract.methods.getOrder(sellOrder1Key).call({ from: props.address }).then((order) => {            
+            try {
+                assert.equal(order.orderType, OrderType.SELL);
+                assert.equal(order.orderStrategy, OrderStrategy.AON);
+                assert.equal(order.seller, props.address);
+                assert.equal(order.tokenId, ar.tokenId);
+                assert.equal(order.originalAmount, 1500);
+                assert.equal(order.amountRemaining, 1500);
+                assert.equal(order.status, 0);
+                assert.equal(order.price, 1);
+                done();
+            } catch (error) {
+                done(error);
+            }
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    // #1 Buy
+    it(`Should post a New Buy Order from ${props.user1.address}`, (done) => {
+        const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.BUY, OrderStrategy.AON, 1500, 1, 0);
+        buyOrder1Key = orderRequest.key;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log("Order Posted");
+            done();
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it(`Should confirm order is successfully posted and bought`, (done) => {
+        AssetManagerContract.methods.getOrder(buyOrder1Key).call({ from: props.address }).then((order) => {
+            try {
+                assert.equal(order.orderType, OrderType.BUY);
+                assert.equal(order.orderStrategy, OrderStrategy.AON);
+                assert.equal(order.buyer, props.user1.address);
+                assert.equal(order.tokenId, ar.tokenId);
+                assert.equal(order.originalAmount, 1500);
+                assert.equal(order.amountRemaining, 0);
+                assert.equal(order.status, 1);
+                assert.equal(order.price, 1);
+                done();
+            } catch (error) {
+                done(error);
+            }
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT); 
+    
+    // #2 Sell
+    it(`It should post a New Sell Order from ${issuer}`, (done) => {
+        const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.SELL, OrderStrategy.AON, 1500, 1, 0);
+        sellOrder1Key = orderRequest.key;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log("Order Posted");
+            done();
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it(`Should confirm order is successfully posted`, (done) => {
+        AssetManagerContract.methods.getOrder(sellOrder1Key).call({ from: props.address }).then((order) => {            
+            try {
+                assert.equal(order.orderType, OrderType.SELL);
+                assert.equal(order.orderStrategy, OrderStrategy.AON);
+                assert.equal(order.seller, props.address);
+                assert.equal(order.tokenId, ar.tokenId);
+                assert.equal(order.originalAmount, 1500);
+                assert.equal(order.amountRemaining, 1500);
+                assert.equal(order.status, 0);
+                assert.equal(order.price, 1);
+                done();
+            } catch (error) {
+                done(error);
+            }
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);  
+    
+    // #2 Buy
+    it(`Should post a New Buy Order from ${props.user1.address}`, (done) => {
+        const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.BUY, OrderStrategy.AON, 700, 1, 0);
+        buyOrder1Key = orderRequest.key;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log("Order Posted");
+            done();
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it(`Should confirm order is successfully posted but not bought`, (done) => {
+        AssetManagerContract.methods.getOrder(buyOrder1Key).call({ from: props.address }).then((order) => {
+            try {
+                assert.equal(order.orderType, OrderType.BUY);
+                assert.equal(order.orderStrategy, OrderStrategy.AON);
+                assert.equal(order.buyer, props.user1.address);
+                assert.equal(order.tokenId, ar.tokenId);
+                assert.equal(order.originalAmount, 700);
+                assert.equal(order.amountRemaining, 700);
+                assert.equal(order.status, 0);
+                assert.equal(order.price, 1);
+                done();
+            } catch (error) {
+                done(error);
+            }
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);     
+
+    // #3 Buy #1
+    it(`Should post a New Buy Order from ${props.user1.address}`, (done) => {
+        const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.BUY, OrderStrategy.AON, 1500, 1, 0);
+        buyOrder1Key = orderRequest.key;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log("Order Posted");
+            done();
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it(`Should confirm order is successfully posted and bought`, (done) => {
+        AssetManagerContract.methods.getOrder(buyOrder1Key).call({ from: props.address }).then((order) => {
+            try {
+                assert.equal(order.orderType, OrderType.BUY);
+                assert.equal(order.orderStrategy, OrderStrategy.AON);
+                assert.equal(order.buyer, props.user1.address);
+                assert.equal(order.tokenId, ar.tokenId);
+                assert.equal(order.originalAmount, 1500);
+                assert.equal(order.amountRemaining, 0);
+                assert.equal(order.status, 1);
+                assert.equal(order.price, 1);
+                done();
+            } catch (error) {
+                done(error);
+            }
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);     
+
+    // #4 Match #2 (SELL)
+    it(`It should post a New Sell Order from ${issuer}`, (done) => {
+        const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.SELL, OrderStrategy.GTC, 700, 1, 0);
+        sellOrder1Key = orderRequest.key;
+        AssetManagerContract.methods.postOrder(orderRequest).send({ from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
+            console.log("Order Posted");
+            done();
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+
+    it(`Should confirm order is successfully posted and sold (matched)`, (done) => {
+        AssetManagerContract.methods.getOrder(sellOrder1Key).call({ from: props.address }).then((order) => {            
+            try {
+                assert.equal(order.orderType, OrderType.SELL);
+                assert.equal(order.orderStrategy, OrderStrategy.GTC);
+                assert.equal(order.seller, props.issuer);
+                assert.equal(order.tokenId, ar.tokenId);
+                assert.equal(order.originalAmount, 700);
+                assert.equal(order.amountRemaining, 0);
+                assert.equal(order.status, 1);
+                assert.equal(order.price, 1);
+                done();
+            } catch (error) {
+                done(error);
+            }
+        }, (error) => {
+            done(error);
+        });
+    }).timeout(TIMEOUT);
+});
+
+describe.skip('Asset Manager V2 Order Book Management Tests: GOOD TILL CANCEL Orders', () => {
+    before(function (done) {
+        this.timeout(TIMEOUT);
+        unlockAccounts(done);
+    });
+
+    it(`It should post a New Sell Order from ${issuer}`, (done) => {
         const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.SELL, OrderStrategy.GTC, 1500, 1, 0);
         sellOrder1Key = orderRequest.key;
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: issuer, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
@@ -296,7 +495,7 @@ describe('Asset Manager V2 Order Book Management Tests', () => {
         });
     }).timeout(TIMEOUT);
 
-    it(`Should post a new GOOD_TILL_CANCEL Buy Order from ${props.user1.address}`, (done) => {
+    it(`Should post a New Buy Order from ${props.user1.address}`, (done) => {
         const orderRequest = getOrderRequestV2(ar.tokenId, OrderType.BUY, OrderStrategy.GTC, 1500, 1, 0);
         buyOrder1Key = orderRequest.key;
         AssetManagerContract.methods.postOrder(orderRequest).send({ from: props.user1.address, gas: props.gas, gasPrice: props.gasPrice }).then(() => {

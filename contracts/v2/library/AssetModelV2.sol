@@ -6,9 +6,9 @@ library AssetModelV2 {
     struct AssetRequest {
         uint256 tokenId;
         string name;
-        string symbol;                
-        uint256 totalQuantity;
-        uint256 price;
+        string symbol;
+        uint256 totalSupply;
+        uint256 issuingPrice;
         address issuer;
     }
 
@@ -17,15 +17,10 @@ library AssetModelV2 {
         address owner;
         address sharesContract;
         string name;
-        string symbol;                
+        string symbol;
         uint256 totalSupply;
         uint256 issuingPrice;
-    }
-
-    struct UserShares {
-        uint256 tokenId;
-        address owner;
-        uint256 amountOwned;
+        address issuer;
     }
 
     function validateAsset(AssetRequest memory asset) public pure {
@@ -34,7 +29,7 @@ library AssetModelV2 {
         require(b.length > 0, 'asset name can not be empty');
         require(b1.length > 0, 'assset symbol can not be empty');
         require(asset.tokenId > 0, 'token id must be greater than 0');
-        require(asset.totalQuantity > 0, 'total supply must be greater than 0');
+        require(asset.totalSupply > 0, 'total supply must be greater than 0');
         require(asset.issuer != address(0), 'asset issuer address does not exist');
     }
 }

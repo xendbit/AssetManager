@@ -24,8 +24,8 @@ describe.skip('AssetManager Assets & Tokens Tests', () => {
         const assetRequest = {
             name: 'BUD',
             description: 'Budweissser',
-            totalQuantity: 100000000,
-            price: 1,
+            totalSupply: 100000000,
+            issueingPrice: 1,
             decimal: 2
         }
         AssetManagerContract.methods.createAsset(assetRequest).send({ from: props.address }).then(() => {
