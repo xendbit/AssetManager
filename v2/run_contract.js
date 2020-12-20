@@ -56,6 +56,17 @@ function processEvents() {
     });
 }
 
+function getPK() {
+    var keythereum = require("keythereum");
+    var datadir = "/Users/aardvocate/private";
+    var address= "0xB6D80F6d661927afEf42f39e52d630E250696bc4";
+    const password = "Wq017kmg@tm";
+    
+    var keyObject = keythereum.importFromFile(address, datadir);
+    var privateKey = keythereum.recover(password, keyObject);
+    console.log(privateKey.toString('hex'));    
+}
+
 async function mint(tokenId, name, symbol, totalQuantity, price) {
     const assetRequest = {
         tokenId: tokenId,
@@ -165,8 +176,9 @@ async function getOrder(key) {
     console.log(order);
 }
 
+getPK();
 //erc20Methods();
-processEvents();
+//processEvents();
 //showMethods();
 async function run() {    
     // const tokenId = Math.floor(Math.random() * 100000000);

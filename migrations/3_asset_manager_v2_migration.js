@@ -8,6 +8,7 @@ const props = require('../config/config');
 const web3 = new Web3(props.web3URL);
 
 web3.eth.personal.unlockAccount(props.contractor, props.password).then(() => {
+  console.log(`unlocked ${props.web3URL}`)
   console.log(`unlocked ${props.contractor}`)
 });
 

@@ -115,7 +115,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         _safeMint(msg.sender, ar.tokenId);
         // create an ERC20 Smart contract and assign the shares to issuer
         ShareContract shareContract = new ShareContract(
-            ar.name,
+            ar.description,
             ar.symbol,
             ar.totalSupply,
             ar.issuingPrice,
@@ -150,23 +150,13 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         wallet.allow(recipient, amount);
     }
 
-    /**
-        Caller of the contract is the buyer.
-        Buyer transfers amount * price to seller from wallet
-        Seller transfers amount to buyer from shares
-     */
-    function buyShares(uint256 tokenId, address seller, uint256 amount, uint256 price) external {
-        address buyer = msg.sender;
-        _buyShares(buyer, tokenId, seller, amount, price);
-    }
-
     function tokenShares(uint256 tokenId) external view returns (AssetModelV2.TokenShares memory) {
         address tokenOwner = ownerOf(tokenId);
 
         ShareContract shareContract = shares[tokenId];
         (
             address sharesContract,
-            string memory name,
+            string memory description,
             string memory symbol,
             uint256 totalSupply,
             uint256 issuingPrice,
@@ -177,7 +167,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                 tokenId: tokenId,
                 owner: tokenOwner,
                 sharesContract: sharesContract,
-                name: name,
+                description: description,
                 symbol: symbol,
                 totalSupply: totalSupply,
                 issuingPrice: issuingPrice,

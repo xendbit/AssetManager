@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 library AssetModelV2 {
     struct AssetRequest {
         uint256 tokenId;
-        string name;
+        string description;
         string symbol;
         uint256 totalSupply;
         uint256 issuingPrice;
@@ -16,7 +16,7 @@ library AssetModelV2 {
         uint256 tokenId;
         address owner;
         address sharesContract;
-        string name;
+        string description;
         string symbol;
         uint256 totalSupply;
         uint256 issuingPrice;
@@ -24,9 +24,9 @@ library AssetModelV2 {
     }
 
     function validateAsset(AssetRequest memory asset) public pure {
-        bytes memory b = bytes(asset.name);
+        bytes memory b = bytes(asset.description);
         bytes memory b1 = bytes(asset.symbol);
-        require(b.length > 0, 'asset name can not be empty');
+        require(b.length > 0, 'asset description can not be empty');
         require(b1.length > 0, 'assset symbol can not be empty');
         require(asset.tokenId > 0, 'token id must be greater than 0');
         require(asset.totalSupply > 0, 'total supply must be greater than 0');

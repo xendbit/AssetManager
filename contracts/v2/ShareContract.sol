@@ -9,7 +9,13 @@ contract ShareContract is ERC20 {
     uint256 private _issuingPrice;
     address _issuer;
 
-    constructor (string memory name, string memory symbol, uint256 totalSupply, uint256 price,  address owner) ERC20(name, symbol) public {
+    constructor (
+        string memory description,
+        string memory symbol,
+        uint256 totalSupply,
+        uint256 price,
+        address owner
+    ) ERC20(description, symbol) public {
         // constructor
         address assetManagerV2 = msg.sender;
         _mint(owner, totalSupply);
