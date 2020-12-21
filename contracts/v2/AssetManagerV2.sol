@@ -9,13 +9,6 @@ import "./library/OrderModelV2.sol";
 import "../library/Constants.sol";
 
 contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
-    event DEBUG(address str);
-    event DEBUG(uint256 str);
-    event DEBUG(string str);
-    event OrderPosted(OrderModelV2.Order order);
-    event OrderBought(OrderModelV2.Order order);
-    event OrderSold(OrderModelV2.Order order);
-
     mapping(uint256 => ShareContract) shares;
 
     ShareContract wallet;
@@ -75,7 +68,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                 address(this)
             );
             if (sellerShares < or.amount) {
-                revert("You don't have enough shares for this transaction");
+                revert("NEAFT");
             }
         }
 
@@ -101,7 +94,6 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
 
         _populateFilteredOrders(dbOrder.key, dbOrder.orderType, dbOrder.buyer, dbOrder.seller);
 
-        emit OrderPosted(dbOrder);
         _matchOrder(dbOrder);
     }
 
@@ -110,8 +102,14 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function mint(AssetModelV2.AssetRequest memory ar) external {
-        AssetModelV2.validateAsset(ar);
-        require(owner == msg.sender, 'Only contract creator can mint new tokens');
+        bytes memory b = bytes(ar.description);
+        bytes memory b1 = bytes(ar.symbol);
+        require(b.length > 0, 'ADIE');
+        require(b1.length > 0, 'ASIE');
+        require(ar.tokenId > 0, 'TIIE');
+        require(ar.totalSupply > 0, 'TSIE');
+        require(ar.issuer != address(0), 'ARIS');
+        require(owner == msg.sender, 'OCCM');
         _safeMint(msg.sender, ar.tokenId);
         // create an ERC20 Smart contract and assign the shares to issuer
         ShareContract shareContract = new ShareContract(
@@ -144,7 +142,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function fundWallet(address recipient, uint256 amount) external {
-        require(owner == msg.sender, 'Only Contract Creator can fund wallet');
+        require(owner == msg.sender, 'OCCFW');
         wallet.transferFrom(msg.sender, recipient, amount);
         // Allow this contract to spend on recipients behalf
         wallet.allow(recipient, amount);
@@ -321,8 +319,6 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         buyOrder.amountRemaining = 0;
         _filterMatchedOrder(buyOrder);
         _filterMatchedOrder(sellOrder);
-        emit OrderBought(buyOrder);
-        emit OrderSold(sellOrder);
     }
 
     function _processOrderBuyPartial(
@@ -333,7 +329,6 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         buyOrder.amountRemaining = buyOrder.amountRemaining.sub(sellOrder.amountRemaining);
         sellOrder.amountRemaining = 0;
         _filterMatchedOrder(sellOrder);
-        emit OrderSold(sellOrder);
     }
 
     function _processOrderSellPartial(
@@ -344,7 +339,6 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         sellOrder.amountRemaining = sellOrder.amountRemaining.sub(buyOrder.amountRemaining);
         buyOrder.amountRemaining = 0;
         _filterMatchedOrder(buyOrder);
-        emit OrderBought(buyOrder);
     }
 
     function _filterMatchedOrder(OrderModelV2.Order memory order) internal {
