@@ -49,10 +49,4 @@ library OrderModelV2 {
         uint256 goodUntil; // this should be 0 unless if order is GOOD_TILL_DATE or GOOD_TILL_MONTH
         bytes32 key; // sha3 of (amount, price, tokenId, time)
     }
-
-    function validateOrder(OrderRequest memory or) public pure {
-        require(or.tokenId > 0, 'Invalid token id');
-        require(or.amount > 0, 'Invalid order amount');
-        require(or.price > 0, 'Invalid order price');
-    }
 }

@@ -13,7 +13,7 @@ const { unlockAccounts, getOrderRequestV2, OrderType, OrderStrategy } = require(
 
 const ar = {
     tokenId: Math.floor(Math.random() * 100000000),
-    name: 'Test Asset',
+    description: 'Test Asset',
     symbol: 'TAX',
     totalSupply: 1000000,
     issuingPrice: 10,
@@ -21,7 +21,7 @@ const ar = {
 };
 
 const ar2 = {
-    name: 'Test Asset',
+    description: 'Test Asset',
     tokenId: Math.floor(Math.random() * 100000000),
     symbol: 'TAX',
     totalSupply: 1000000,
@@ -51,7 +51,7 @@ describe('Asset Manager V2 Minting Test', () => {
     it('Should mint a new token', (done) => {
         AssetManagerContract.methods.mint(ar).send({ from: props.contractor, gas: props.gas, gasPrice: props.gasPrice }).then(() => {
             console.log('Asset Minted');
-            issuerBalance += ar.totalQuantity;
+            issuerBalance += ar.totalSupply;
             done();
         }, (error) => {
             done(error);
@@ -92,10 +92,10 @@ describe('Asset Manager V2 Minting Test', () => {
             try {
                 assert.equal(sca.owner, props.contractor);
                 assert.equal(sca.tokenId, ar.tokenId);
-                assert.equal(sca.name, ar.name);
+                assert.equal(sca.description, ar.description);
                 assert.equal(sca.symbol, ar.symbol);
-                assert.equal(sca.totalSupply, ar.totalQuantity);
-                assert.equal(sca.issuingPrice, ar.price);
+                assert.equal(sca.totalSupply, ar.totalSupply);
+                assert.equal(sca.issuingPrice, ar.issuingPrice);
                 assert.notEqual(sca.sharesContract, "0x0000000000000000000000000000000000000000");
                 done();
             } catch (e) {
@@ -149,10 +149,10 @@ describe('Asset Manager Token Transfer Tests', () => {
             try {
                 assert.equal(sca.owner, props.issuer);
                 assert.equal(sca.tokenId, ar.tokenId);
-                assert.equal(sca.name, ar.name);
+                assert.equal(sca.description, ar.description);
                 assert.equal(sca.symbol, ar.symbol);
-                assert.equal(sca.totalSupply, ar.totalQuantity);
-                assert.equal(sca.issuingPrice, ar.price);
+                assert.equal(sca.totalSupply, ar.totalSupply);
+                assert.equal(sca.issuingPrice, ar.issuingPrice);
                 assert.notEqual(sca.sharesContract, "0x0000000000000000000000000000000000000000");
                 done();
             } catch (e) {
@@ -165,7 +165,7 @@ describe('Asset Manager Token Transfer Tests', () => {
 
     it('should confirm owned shares', (done) => {
         AssetManagerContract.methods.ownedShares(ar.tokenId, props.issuer).call().then((ownedShares) => {
-            assert.equal(ownedShares, ar.totalQuantity);
+            assert.equal(ownedShares, ar.totalSupply);
             done();
         }, error => {
             done(error);

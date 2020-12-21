@@ -40,7 +40,9 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function postOrder(OrderModelV2.OrderRequest memory or) external {
-        OrderModelV2.validateOrder(or);
+        require(or.tokenId > 0, 'TIIN');
+        require(or.amount > 0, 'AIN');
+        require(or.price > 0, 'OPIN');
 
         address seller;
         address buyer;
