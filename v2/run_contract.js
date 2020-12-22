@@ -171,12 +171,23 @@ async function postOrder(tokenId, orderType, orderStrategy, amount, price, goodU
     return key;
 }
 
-async function getOrder(key) {
-    let order = await AssetManagerContract.methods.getOrder(key).call({from: props.address});
-    console.log(order);
+const Utili = require('web3-utils');
+
+function getOrder(key) {
+    const ar = {
+        tokenId: Math.floor(Math.random() * 100000000),
+        description: 'Test Asset',
+        symbol: 'TAX',
+        totalSupply: 1000000,
+        issuingPrice: 10,
+        issuer: props.issuer
+    };
+
+    console.log(ar);
+    console.log(Utili.sha3('hello world'));
 }
 
-getPK();
+getOrder();
 //erc20Methods();
 //processEvents();
 //showMethods();

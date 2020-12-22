@@ -39,7 +39,8 @@ library OrderModelV2 {
         uint256 statusDate;
         uint256 goodUntil;
     }
-
+    
+    // [1, 0, 100, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fae"]
     struct OrderRequest {
         OrderType orderType;
         OrderStrategy orderStrategy;
