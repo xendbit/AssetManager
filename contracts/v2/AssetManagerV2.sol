@@ -6,9 +6,11 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./ShareContract.sol";
 import "./library/AssetModelV2.sol";
 import "./library/OrderModelV2.sol";
-import "../library/Constants.sol";
+import "./library/ConstantsV2.sol";
 
 contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
+    event DEBUG(string str);
+    
     mapping(uint256 => ShareContract) shares;
 
     ShareContract wallet;
@@ -188,12 +190,12 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     function _populateFilteredOrders(
         OrderModelV2.SortedKey memory key,
         OrderModelV2.OrderType orderType, address buyer, address seller) internal {
-        filtered[Constants.PENDING_ORDERS_KEY].push(key);
+        filtered[ConstantsV2.PENDING_ORDERS_KEY].push(key);
         if (orderType == OrderModelV2.OrderType.BUY) {
-            filtered[Constants.BUY_ORDERS_KEY].push(key);
+            filtered[ConstantsV2.BUY_ORDERS_KEY].push(key);
             userOrders[buyer].push(key);
         } else {
-            filtered[Constants.SELL_ORDERS_KEY].push(key);
+            filtered[ConstantsV2.SELL_ORDERS_KEY].push(key);
             userOrders[seller].push(key);
         }
     }
@@ -201,16 +203,16 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     function _matchOrder(OrderModelV2.Order memory mo) internal {
         bool matched = false;
         OrderModelV2.Order memory matchingOrder = mo;
-        uint256 pendingOrdersSize = filtered[Constants.PENDING_ORDERS_KEY].length;
+        uint256 pendingOrdersSize = filtered[ConstantsV2.PENDING_ORDERS_KEY].length;
         if (pendingOrdersSize == 1) {
             return;
         }
 
         uint256 k = pendingOrdersSize.sub(1);
-        uint256 end = pendingOrdersSize > Constants.MAX_ORDERS_TO_PROCESS ? Constants.MAX_ORDERS_TO_PROCESS : 0;
+        uint256 end = pendingOrdersSize > ConstantsV2.MAX_ORDERS_TO_PROCESS ? ConstantsV2.MAX_ORDERS_TO_PROCESS : 0;
 
         while (k >= end && matched == false) {
-            OrderModelV2.Order memory toMatch = orders[filtered[Constants.PENDING_ORDERS_KEY][k].key];
+            OrderModelV2.Order memory toMatch = orders[filtered[ConstantsV2.PENDING_ORDERS_KEY][k].key];
             // tokenId equals
             bool tokenIdEquals = matchingOrder.tokenId == toMatch.tokenId;
             // Same Type
@@ -231,7 +233,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
             if (shouldProcess) {
                 OrderModelV2.Order memory buyOrder;
                 OrderModelV2.Order memory sellOrder;
-                Constants.Values memory returnValues;
+                ConstantsV2.Values memory returnValues;
                 if (matchingOrder.orderType == OrderModelV2.OrderType.BUY) {
                     buyOrder = matchingOrder;
                     sellOrder = toMatch;
@@ -268,10 +270,8 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         }
     }
 
-    function _processOrder(
-        OrderModelV2.Order memory buyOrder,
-        OrderModelV2.Order memory sellOrder) internal returns (Constants.Values memory returnValues) {
-        returnValues = Constants.Values({
+    function _processOrder(OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal returns (ConstantsV2.Values memory returnValues) {
+        returnValues = ConstantsV2.Values({
             matched: false,
             buyExpired: false,
             sellExpired: false,
@@ -312,7 +312,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function _processOrderSameAmount(
-        Constants.Values memory returnValues,
+        ConstantsV2.Values memory returnValues,
         OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
         returnValues.toBuy = buyOrder.amountRemaining;
         returnValues.toSell = sellOrder.amountRemaining;
@@ -324,7 +324,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function _processOrderBuyPartial(
-        Constants.Values memory returnValues,
+        ConstantsV2.Values memory returnValues,
         OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
         returnValues.toBuy = sellOrder.amountRemaining;
         returnValues.toSell = sellOrder.amountRemaining;
@@ -334,7 +334,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function _processOrderSellPartial(
-        Constants.Values memory returnValues,
+        ConstantsV2.Values memory returnValues,
         OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
         returnValues.toBuy = buyOrder.amountRemaining;
         returnValues.toSell = buyOrder.amountRemaining;
@@ -347,31 +347,31 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         OrderModelV2.SortedKey memory key = order.key;
         _deleteElement(key);
 
-        filtered[Constants.MATCHED_ORDERS_KEY].push(order.key);
+        filtered[ConstantsV2.MATCHED_ORDERS_KEY].push(order.key);
         order.status = OrderModelV2.OrderStatus.MATCHED;
         order.statusDate = block.timestamp;
     }
 
     function _deleteElement(OrderModelV2.SortedKey memory key) internal {
-        if(filtered[Constants.PENDING_ORDERS_KEY].length == 0) {
+        if(filtered[ConstantsV2.PENDING_ORDERS_KEY].length == 0) {
             return;
         }
 
-        if(filtered[Constants.PENDING_ORDERS_KEY].length == 1) {
-            filtered[Constants.PENDING_ORDERS_KEY].pop();
+        if(filtered[ConstantsV2.PENDING_ORDERS_KEY].length == 1) {
+            filtered[ConstantsV2.PENDING_ORDERS_KEY].pop();
             return;
         }
 
-        uint256 size = filtered[Constants.PENDING_ORDERS_KEY].length.sub(
+        uint256 size = filtered[ConstantsV2.PENDING_ORDERS_KEY].length.sub(
             1);
-        int256 pos = Constants.binarySearchV2(filtered[Constants.PENDING_ORDERS_KEY], 0, int256(size), key);
+        int256 pos = ConstantsV2.binarySearchV2(filtered[ConstantsV2.PENDING_ORDERS_KEY], 0, int256(size), key);
 
         if (pos >= 0) {
             for(uint256 i = uint256(pos); i < size; i++) {
-                filtered[Constants.PENDING_ORDERS_KEY][i] = filtered[Constants.PENDING_ORDERS_KEY][i + 1];
+                filtered[ConstantsV2.PENDING_ORDERS_KEY][i] = filtered[ConstantsV2.PENDING_ORDERS_KEY][i + 1];
             }
-            //delete filtered[Constants.PENDING_ORDERS_KEY][uint256(pos)];
-            filtered[Constants.PENDING_ORDERS_KEY].pop();
+            //delete filtered[ConstantsV2.PENDING_ORDERS_KEY][uint256(pos)];
+            filtered[ConstantsV2.PENDING_ORDERS_KEY].pop();
         }
     }
 

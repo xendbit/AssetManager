@@ -70,10 +70,10 @@ function getPK() {
 async function mint(tokenId, name, symbol, totalQuantity, price) {
     const assetRequest = {
         tokenId: tokenId,
-        name: name,        
+        description: name,        
         symbol: symbol,
-        totalQuantity: totalQuantity,
-        price: price,
+        totalSupply: totalQuantity,
+        issuingPrice: price,
         issuer: props.address
     }
 
@@ -90,10 +90,10 @@ async function mint(tokenId, name, symbol, totalQuantity, price) {
 
     await web3.eth.personal.unlockAccount(props.contractor, 'Wq017kmg@tm');
     console.log("Account Unlocked");
-    await AssetManagerContract.methods.mint(assetRequest).send({ from: props.contractor });
+    await AssetManagerContract.methods.mint(assetRequest).send({ from: props.contractor, gasPrice: props.gasPrice });
     console.log('Asset Minted');
     await AssetManagerContract.methods.transferShares(tokenId, props.address, totalQuantity).send({ from: props.contractor });
-    console.log('Token Shares Transafered');
+    console.log('Token Shares Transfered');
 }
 
 async function tokenShares(tokenId) {
@@ -187,15 +187,15 @@ function getOrder(key) {
     console.log(Utili.sha3('hello world'));
 }
 
-getOrder();
+//getOrder();
 //erc20Methods();
 //processEvents();
 //showMethods();
 async function run() {    
-    // const tokenId = Math.floor(Math.random() * 100000000);
-    // console.log(tokenId);
-    // await mint(tokenId, 'Test Asset', 'TAX', 1000000, 10);    
-    // await tokenShares(tokenId);
+     const tokenId = Math.floor(Math.random() * 100000000);
+     console.log(tokenId);
+     await mint(tokenId, 'Test Asset', 'TAX', 1000000, 10);    
+     await tokenShares(tokenId);
     // await walletBalance(props.contractor);
     // await ownedShares(tokenId, props.contractor);
     // await ownedShares(tokenId, props.contractAddress);
