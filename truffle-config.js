@@ -24,6 +24,11 @@
 // const fs = require('fs');
 // const mnemonic = fs.readFileSync(".secret").toString().trim();
 
+const PrivateKeyProvider = require("truffle-privatekey-provider");
+const privateKey = "c5fd8168f094e64e585be23c240b01ed6da7dbe783cf47421f8472214bf701b0";
+const provider =  new PrivateKeyProvider(privateKey, 'https://ropsten.infura.io/v3/3fa594a20e104a479791fc67c5f4afef');
+
+
 module.exports = {
   /**
    * Networks define how you connect to your ethereum client and let you set the
@@ -53,7 +58,15 @@ module.exports = {
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "1337",       // Any network (default: none)
       from: "0xB6D80F6d661927afEf42f39e52d630E250696bc4",
-    },    
+    },  
+    ropsten: {
+      provider: () => provider,
+      network_id: 3,       // Ropsten's id
+      gas: 5500000,        // Ropsten has a lower block limit than mainnet
+      confirmations: 1,    // # of confs to wait between deployments. (default: 0)
+      timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
+      skipDryRun: true     // Skip dry run before migrations? (default: false for public nets )
+    },
     // Another network with more advanced options...
     // advanced: {
     // port: 8777,             // Custom port

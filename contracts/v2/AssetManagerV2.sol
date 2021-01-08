@@ -41,7 +41,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         return shareContract.allowance(userAddress, address(this));
     }
 
-    function postOrder(OrderModelV2.OrderRequest memory or) external {
+    function postOrder(OrderModelV2.OrderRequest calldata or) external {
         require(or.tokenId > 0, 'TIIN');
         require(or.amount > 0, 'AIN');
         require(or.price > 0, 'OPIN');
@@ -60,7 +60,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                 // update escrow
                 escrow[buyer] = escrow[buyer].add(totalCost);
             } else {
-                revert("Low Balance");
+                revert("LB");
             }
         } else if (or.orderType == OrderModelV2.OrderType.SELL) {
             buyer = address(0);
@@ -105,15 +105,15 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         return orders[key];
     }
 
-    function mint(AssetModelV2.AssetRequest memory ar) external {
+    function mint(AssetModelV2.AssetRequest calldata ar) external {
         bytes memory b = bytes(ar.description);
         bytes memory b1 = bytes(ar.symbol);
-        require(b.length > 0, 'ADIE');
-        require(b1.length > 0, 'ASIE');
-        require(ar.tokenId > 0, 'TIIE');
-        require(ar.totalSupply > 0, 'TSIE');
-        require(ar.issuer != address(0), 'ARIS');
-        require(owner == msg.sender, 'OCCM');
+        require(b.length > 0, 'ADI');
+        require(b1.length > 0, 'ASI');
+        require(ar.tokenId > 0, 'TII');
+        require(ar.totalSupply > 0, 'TSI');
+        require(ar.issuer != address(0), 'ARI');
+        require(owner == msg.sender, 'OCC');
         _safeMint(msg.sender, ar.tokenId);
         // create an ERC20 Smart contract and assign the shares to issuer
         ShareContract shareContract = new ShareContract(
@@ -146,7 +146,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function fundWallet(address recipient, uint256 amount) external {
-        require(owner == msg.sender, 'OCCFW');
+        require(owner == msg.sender, 'OCCF');
         wallet.transferFrom(msg.sender, recipient, amount);
         // Allow this contract to spend on recipients behalf
         wallet.allow(recipient, amount);
