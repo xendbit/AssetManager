@@ -9,8 +9,6 @@ import "./library/OrderModelV2.sol";
 import "./library/ConstantsV2.sol";
 
 contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
-    event DEBUG(string str);
-    
     mapping(uint256 => ShareContract) shares;
 
     ShareContract wallet;
@@ -42,9 +40,9 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function postOrder(OrderModelV2.OrderRequest calldata or) external {
-        require(or.tokenId > 0, 'TIIN');
-        require(or.amount > 0, 'AIN');
-        require(or.price > 0, 'OPIN');
+        require(or.tokenId > 0);
+        require(or.amount > 0);
+        require(or.price > 0);
 
         address seller;
         address buyer;
@@ -67,12 +65,15 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
             seller = msg.sender;
             //check that you have the asset you want to sell
             ShareContract shareContract = shares[or.tokenId];
-            uint256 sellerShares = shareContract.allowance(
-                seller,
-                address(this)
-            );
+            uint256 sellerShares = shareContract.allowance(seller, address(this));
+
             if (sellerShares < or.amount) {
-                revert("NEAFT");
+                revert("NEA");
+            } else {
+                // escrow it
+                if(shareContract.transferFrom(seller, owner, or.amount)) {
+                    shareContract.allow(owner, or.amount);
+                }
             }
         }
 
@@ -108,12 +109,12 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     function mint(AssetModelV2.AssetRequest calldata ar) external {
         bytes memory b = bytes(ar.description);
         bytes memory b1 = bytes(ar.symbol);
-        require(b.length > 0, 'ADI');
-        require(b1.length > 0, 'ASI');
-        require(ar.tokenId > 0, 'TII');
-        require(ar.totalSupply > 0, 'TSI');
-        require(ar.issuer != address(0), 'ARI');
-        require(owner == msg.sender, 'OCC');
+        require(b.length > 0);
+        require(b1.length > 0);
+        require(ar.tokenId > 0);
+        require(ar.totalSupply > 0);
+        require(ar.issuer != address(0));
+        require(owner == msg.sender);
         _safeMint(msg.sender, ar.tokenId);
         // create an ERC20 Smart contract and assign the shares to issuer
         ShareContract shareContract = new ShareContract(
@@ -146,7 +147,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function fundWallet(address recipient, uint256 amount) external {
-        require(owner == msg.sender, 'OCCF');
+        require(owner == msg.sender, 'OF');
         wallet.transferFrom(msg.sender, recipient, amount);
         // Allow this contract to spend on recipients behalf
         wallet.allow(recipient, amount);
@@ -201,7 +202,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     }
 
     function _matchOrder(OrderModelV2.Order memory mo) internal {
-        bool matched = false;
+        bool matched;
         OrderModelV2.Order memory matchingOrder = mo;
         uint256 pendingOrdersSize = filtered[ConstantsV2.PENDING_ORDERS_KEY].length;
         if (pendingOrdersSize == 1) {
@@ -255,11 +256,25 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                     if (sellOrder.orderStrategy != OrderModelV2.OrderStrategy.ALL_OR_NONE) {
                         toSeller = returnValues.toSell.mul(sellOrder.price);
                     }
-                    // buy the shares. buyer is buying from seller
+
+                    // update escrows                    
                     escrow[buyOrder.buyer] = escrow[buyOrder.buyer].sub(totalCost);
                     _updateWalletBalance(buyOrder.buyer, totalCost, true);
+                    ShareContract shareContract = shares[buyOrder.tokenId];
+                    if(shareContract.transferFrom(owner, sellOrder.seller, returnValues.toBuy)) {
+                        shareContract.allow(sellOrder.seller, returnValues.toBuy);
+                    }                    
 
-                    _buyShares(buyOrder.buyer, buyOrder.tokenId, sellOrder.seller, returnValues.toBuy, buyOrder.price);
+                    // buy the shares. buyer is buying from seller
+                    if(wallet.transferFrom(buyOrder.buyer, sellOrder.seller, returnValues.toBuy.mul(buyOrder.price))) {
+                        // Allow this contract to spend on seller's behalf
+                        wallet.allow(sellOrder.seller, returnValues.toBuy.mul(buyOrder.price));
+                        
+                        if(shareContract.transferFrom(sellOrder.seller, buyOrder.buyer, returnValues.toBuy)) {
+                            // Allow this contract to spend on buyer's behalf
+                            shareContract.allow(buyOrder.buyer, returnValues.toBuy);
+                        }
+                    }
                 }
             }
             if (k == 0) {
@@ -311,9 +326,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         orders[buyOrder.key.key] = buyOrder;
     }
 
-    function _processOrderSameAmount(
-        ConstantsV2.Values memory returnValues,
-        OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
+    function _processOrderSameAmount(ConstantsV2.Values memory returnValues, OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
         returnValues.toBuy = buyOrder.amountRemaining;
         returnValues.toSell = sellOrder.amountRemaining;
         returnValues.matched = true;
@@ -323,9 +336,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         _filterMatchedOrder(sellOrder);
     }
 
-    function _processOrderBuyPartial(
-        ConstantsV2.Values memory returnValues,
-        OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
+    function _processOrderBuyPartial(ConstantsV2.Values memory returnValues, OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
         returnValues.toBuy = sellOrder.amountRemaining;
         returnValues.toSell = sellOrder.amountRemaining;
         buyOrder.amountRemaining = buyOrder.amountRemaining.sub(sellOrder.amountRemaining);
@@ -333,9 +344,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         _filterMatchedOrder(sellOrder);
     }
 
-    function _processOrderSellPartial(
-        ConstantsV2.Values memory returnValues,
-        OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
+    function _processOrderSellPartial(ConstantsV2.Values memory returnValues, OrderModelV2.Order memory buyOrder, OrderModelV2.Order memory sellOrder) internal {
         returnValues.toBuy = buyOrder.amountRemaining;
         returnValues.toSell = buyOrder.amountRemaining;
         sellOrder.amountRemaining = sellOrder.amountRemaining.sub(buyOrder.amountRemaining);
@@ -345,14 +354,6 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
 
     function _filterMatchedOrder(OrderModelV2.Order memory order) internal {
         OrderModelV2.SortedKey memory key = order.key;
-        _deleteElement(key);
-
-        filtered[ConstantsV2.MATCHED_ORDERS_KEY].push(order.key);
-        order.status = OrderModelV2.OrderStatus.MATCHED;
-        order.statusDate = block.timestamp;
-    }
-
-    function _deleteElement(OrderModelV2.SortedKey memory key) internal {
         if(filtered[ConstantsV2.PENDING_ORDERS_KEY].length == 0) {
             return;
         }
@@ -362,8 +363,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
             return;
         }
 
-        uint256 size = filtered[ConstantsV2.PENDING_ORDERS_KEY].length.sub(
-            1);
+        uint256 size = filtered[ConstantsV2.PENDING_ORDERS_KEY].length.sub(1);
         int256 pos = ConstantsV2.binarySearchV2(filtered[ConstantsV2.PENDING_ORDERS_KEY], 0, int256(size), key);
 
         if (pos >= 0) {
@@ -373,16 +373,9 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
             //delete filtered[ConstantsV2.PENDING_ORDERS_KEY][uint256(pos)];
             filtered[ConstantsV2.PENDING_ORDERS_KEY].pop();
         }
-    }
 
-    function _buyShares(address buyer, uint256 tokenId, address seller, uint256 amount, uint256 price) internal {
-        wallet.transferFrom(buyer, seller, amount.mul(price));
-        // Allow this contract to spend on seller's behalf
-        wallet.allow(seller, amount.mul(price));
-
-        ShareContract shareContract = shares[tokenId];
-        shareContract.transferFrom(seller, buyer, amount);
-        // Allow this contract to spend on buyer's behalf
-        shareContract.allow(buyer, amount);
+        filtered[ConstantsV2.MATCHED_ORDERS_KEY].push(order.key);
+        order.status = OrderModelV2.OrderStatus.MATCHED;
+        order.statusDate = block.timestamp;
     }
 }
