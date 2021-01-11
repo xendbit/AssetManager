@@ -41,7 +41,9 @@ library OrderModelV2 {
     }
     
     // [1, 1, 50, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fae"] -- sell 
-    // [0, 0, 300, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01faf"] -- buy
+    // [1, 1, 150, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"] -- sell
+    // [1, 1, 150, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fac"] -- sell    
+    // [0, 0, 350, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01faf"] -- buy
     struct OrderRequest {
         OrderType orderType;
         OrderStrategy orderStrategy;
