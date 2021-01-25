@@ -39,19 +39,4 @@ library OrderModelV2 {
         uint256 statusDate;
         uint256 goodUntil;
     }
-    
-    // [1, 0, 1000000, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fae"] -- sell 
-    // [1, 1, 150, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"] -- sell
-    // [1, 1, 150, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fac"] -- sell    
-    // [0, 0, 11925, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01faf"] -- buy
-    // [0, 0, 275, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01faf"] -- buy
-    struct OrderRequest {
-        OrderType orderType;
-        OrderStrategy orderStrategy;
-        uint256 amount;
-        uint256 price;
-        uint256 tokenId;
-        uint256 goodUntil; // this should be 0 unless if order is GOOD_TILL_DATE or GOOD_TILL_MONTH
-        bytes32 key; // sha3 of (amount, price, tokenId, time)
-    }
 }

@@ -42,43 +42,4 @@ library ConstantsV2 {
 
         return binarySearchV2(arr, (mid + 1), high, key);
     }
-
-    function _processOrderSameAmount(
-        ConstantsV2.Values memory returnValues, 
-        OrderModelV2.Order memory buyOrder, 
-        OrderModelV2.Order memory sellOrder) public pure 
-    returns (ConstantsV2.Values memory, OrderModelV2.Order memory, OrderModelV2.Order memory) {
-        returnValues.toBuy = buyOrder.amountRemaining;
-        returnValues.toSell = sellOrder.amountRemaining;
-        returnValues.matched = true;
-        sellOrder.amountRemaining = 0;
-        buyOrder.amountRemaining = 0;
-
-        return(returnValues, buyOrder, sellOrder);
-    }    
-
-    function _processOrderBuyPartial(
-        ConstantsV2.Values memory returnValues, 
-        OrderModelV2.Order memory buyOrder, 
-        OrderModelV2.Order memory sellOrder) public pure 
-    returns (ConstantsV2.Values memory, OrderModelV2.Order memory, OrderModelV2.Order memory) {
-        returnValues.toBuy = sellOrder.amountRemaining;
-        returnValues.toSell = sellOrder.amountRemaining;
-        buyOrder.amountRemaining = buyOrder.amountRemaining.sub(sellOrder.amountRemaining);
-        sellOrder.amountRemaining = 0;
-        return(returnValues, buyOrder, sellOrder);
-    }
-
-    function _processOrderSellPartial(
-        ConstantsV2.Values memory returnValues, 
-        OrderModelV2.Order memory buyOrder, 
-        OrderModelV2.Order memory sellOrder) public pure 
-    returns (ConstantsV2.Values memory, OrderModelV2.Order memory, OrderModelV2.Order memory) {
-        returnValues.toBuy = buyOrder.amountRemaining;
-        returnValues.toSell = buyOrder.amountRemaining;
-        sellOrder.amountRemaining = sellOrder.amountRemaining.sub(buyOrder.amountRemaining);
-        buyOrder.amountRemaining = 0;
-        return(returnValues, buyOrder, sellOrder);
-    }
-
 }
