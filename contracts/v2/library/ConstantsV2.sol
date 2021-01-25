@@ -2,8 +2,10 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 import { OrderModelV2 } from './OrderModelV2.sol';
+import "./openzeppelin/SafeMath.sol";
 
 library ConstantsV2 {
+    using SafeMath for uint256;
     bytes32 constant PENDING_ORDERS_KEY = keccak256(bytes("PENDING_ORDERS"));
     bytes32 constant BUY_ORDERS_KEY = keccak256(bytes("BUY_ORDERS"));
     bytes32 constant SELL_ORDERS_KEY = keccak256(bytes("SELL_ORDERS"));
@@ -40,4 +42,43 @@ library ConstantsV2 {
 
         return binarySearchV2(arr, (mid + 1), high, key);
     }
+
+    function _processOrderSameAmount(
+        ConstantsV2.Values memory returnValues, 
+        OrderModelV2.Order memory buyOrder, 
+        OrderModelV2.Order memory sellOrder) public pure 
+    returns (ConstantsV2.Values memory, OrderModelV2.Order memory, OrderModelV2.Order memory) {
+        returnValues.toBuy = buyOrder.amountRemaining;
+        returnValues.toSell = sellOrder.amountRemaining;
+        returnValues.matched = true;
+        sellOrder.amountRemaining = 0;
+        buyOrder.amountRemaining = 0;
+
+        return(returnValues, buyOrder, sellOrder);
+    }    
+
+    function _processOrderBuyPartial(
+        ConstantsV2.Values memory returnValues, 
+        OrderModelV2.Order memory buyOrder, 
+        OrderModelV2.Order memory sellOrder) public pure 
+    returns (ConstantsV2.Values memory, OrderModelV2.Order memory, OrderModelV2.Order memory) {
+        returnValues.toBuy = sellOrder.amountRemaining;
+        returnValues.toSell = sellOrder.amountRemaining;
+        buyOrder.amountRemaining = buyOrder.amountRemaining.sub(sellOrder.amountRemaining);
+        sellOrder.amountRemaining = 0;
+        return(returnValues, buyOrder, sellOrder);
+    }
+
+    function _processOrderSellPartial(
+        ConstantsV2.Values memory returnValues, 
+        OrderModelV2.Order memory buyOrder, 
+        OrderModelV2.Order memory sellOrder) public pure 
+    returns (ConstantsV2.Values memory, OrderModelV2.Order memory, OrderModelV2.Order memory) {
+        returnValues.toBuy = buyOrder.amountRemaining;
+        returnValues.toSell = buyOrder.amountRemaining;
+        sellOrder.amountRemaining = sellOrder.amountRemaining.sub(buyOrder.amountRemaining);
+        buyOrder.amountRemaining = 0;
+        return(returnValues, buyOrder, sellOrder);
+    }
+
 }

@@ -2,13 +2,15 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./library/openzeppelin/ERC721.sol";
 import "./ShareContract.sol";
 import "./library/AssetModelV2.sol";
 import "./library/OrderModelV2.sol";
 import "./library/ConstantsV2.sol";
+import "./library/openzeppelin/SafeMath.sol";
 
 contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
+    using SafeMath for uint256;
     mapping(uint256 => ShareContract) shares;
 
     ShareContract wallet;
@@ -27,7 +29,7 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
 
     constructor() public {
         owner = msg.sender;
-        wallet = new ShareContract("Tether Token", "WALLET", 2**250, 1, msg.sender);
+        wallet = new ShareContract("Tether Token", "WALLET", 10**12, 1, msg.sender);
     }
 
     function walletBalance(address userAddress) external view returns (uint256) {
@@ -127,24 +129,24 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         shares[ar.tokenId] = shareContract;
     }
 
-    function transferShares(uint256 tokenId, address recipient, uint256 amount) external {
-        shares[tokenId].transferFrom(msg.sender, recipient, amount);
-        // Allow this contract to spend on recipients behalf
-        shares[tokenId].allow(recipient, amount);
-    }
+    // function transferShares(uint256 tokenId, address recipient, uint256 amount) external {
+    //     shares[tokenId].transferFrom(msg.sender, recipient, amount);
+    //     // Allow this contract to spend on recipients behalf
+    //     shares[tokenId].allow(recipient, amount);
+    // }
 
-    function transferTokenOwnership(uint256 tokenId, address recipient) external {
-        uint256 sharesOwned = shares[tokenId].allowance(
-            msg.sender,
-            address(this)
-        );
+    // function transferTokenOwnership(uint256 tokenId, address recipient) external {
+    //     uint256 sharesOwned = shares[tokenId].allowance(
+    //         msg.sender,
+    //         address(this)
+    //     );
 
-        // first transfer the shares owned by the caller in tokenId
-        shares[tokenId].transferFrom(msg.sender, recipient, sharesOwned);
-        shares[tokenId].allow(recipient, sharesOwned);
-        // then transfer ownership of the token
-        safeTransferFrom(msg.sender, recipient, tokenId);
-    }
+    //     // first transfer the shares owned by the caller in tokenId
+    //     shares[tokenId].transferFrom(msg.sender, recipient, sharesOwned);
+    //     shares[tokenId].allow(recipient, sharesOwned);
+    //     // then transfer ownership of the token
+    //     safeTransferFrom(msg.sender, recipient, tokenId);
+    // }
 
     function fundWallet(address recipient, uint256 amount) external {
         require(owner == msg.sender, 'OF');
@@ -263,7 +265,9 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                     ShareContract shareContract = shares[buyOrder.tokenId];
                     if(shareContract.transferFrom(owner, sellOrder.seller, returnValues.toBuy)) {
                         shareContract.allow(sellOrder.seller, returnValues.toBuy);
-                    }                    
+                    } else {
+                        revert('NE2');
+                    }               
 
                     // buy the shares. buyer is buying from seller
                     if(wallet.transferFrom(buyOrder.buyer, sellOrder.seller, returnValues.toBuy.mul(buyOrder.price))) {
@@ -274,7 +278,11 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                             // Allow this contract to spend on buyer's behalf
                             shareContract.allow(buyOrder.buyer, returnValues.toBuy);
                         }
+                    } else {
+                        revert('NEM');
                     }
+                } else {
+                    // do nothing
                 }
             }
             if (k == 0) {

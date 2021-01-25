@@ -40,10 +40,11 @@ library OrderModelV2 {
         uint256 goodUntil;
     }
     
-    // [1, 1, 50, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fae"] -- sell 
+    // [1, 0, 1000000, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fae"] -- sell 
     // [1, 1, 150, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"] -- sell
     // [1, 1, 150, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fac"] -- sell    
-    // [0, 0, 350, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01faf"] -- buy
+    // [0, 0, 11925, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01faf"] -- buy
+    // [0, 0, 275, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01faf"] -- buy
     struct OrderRequest {
         OrderType orderType;
         OrderStrategy orderStrategy;

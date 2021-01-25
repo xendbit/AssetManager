@@ -2,10 +2,12 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "./library/openzeppelin/ERC20.sol";
+import "./library/openzeppelin/SafeMath.sol";
 
 contract ShareContract is ERC20 {
-
+    using SafeMath for uint256;
+    
     uint256 private _issuingPrice;
     address _issuer;
 
@@ -15,7 +17,7 @@ contract ShareContract is ERC20 {
         uint256 totalSupply,
         uint256 price,
         address owner
-    ) ERC20(description, symbol) public {
+    ) public ERC20(description, symbol) {
         // constructor
         address assetManagerV2 = msg.sender;
         _mint(owner, totalSupply);
