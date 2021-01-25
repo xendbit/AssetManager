@@ -2,14 +2,15 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 
-import "./library/openzeppelin/ERC721.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.3.0/contracts/token/ERC721/ERC721.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.3.0/contracts/math/SafeMath.sol";
 import "./ShareContract.sol";
 import "./library/OrderModelV2.sol";
 import "./library/ConstantsV2.sol";
-import "./library/openzeppelin/SafeMath.sol";
 
 contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     using SafeMath for uint256;
+    
     mapping(uint256 => ShareContract) shares;
 
     ShareContract wallet;
@@ -37,38 +38,6 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
 
     function ownedShares(uint256 tokenId, address userAddress) external view returns (uint256) {        
         return shares[tokenId].allowance(userAddress, address(this));
-    }
-
-    function buy(bytes32 orderKey, address buyer) external {
-        OrderModelV2.Order memory or = orders[orderKey];
-        // check that buyer have enough money to buy 
-            uint256 totalCost = or.amountRemaining.mul(or.price);
-            uint256 buyerNgncBalance = wallet.allowance(buyer, address(this));
-            if (buyerNgncBalance >= totalCost) {
-                ShareContract shareContract = shares[or.tokenId];
-                // update escrows
-                if(shareContract.transferFrom(owner, or.seller, or.amountRemaining)) {
-                    shareContract.allow(or.seller, or.amountRemaining);
-                } else {
-                    revert('NE2');
-                }               
-                
-                if(wallet.transferFrom(buyer, or.seller, totalCost)) {
-                    // Allow this contract to spend on seller's behalf
-                    wallet.allow(or.seller, totalCost);
-                    
-                    if(shareContract.transferFrom(or.seller, buyer, or.amountRemaining)) {
-                        // Allow this contract to spend on buyer's behalf
-                        shareContract.allow(buyer, or.amountRemaining);
-                    }
-                } else {
-                    revert('NEM');
-                }
-                or.amountRemaining = 0;
-                _filterMatchedOrder(or);
-            } else {
-                revert("LB");
-            }
     }
 
     // [1, 0, 1000000, 10, 86438967, 0, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fae"] -- sell 
@@ -148,9 +117,12 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         return orders[key];
     }
 
-    // [86438967,"Test Asset","TAX",1000000, 10, "0x94Ce615ca10EFb74cED680298CD7bdB0479940bc"]
+    // [86438967,"Test Asset","TAX",500, 10, "0x94Ce615ca10EFb74cED680298CD7bdB0479940bc"]
     // 0xf0eB683bb243eCE4Fe94494E4014628AfCb6Efe5 - Account 3
     // [86438966,"Test Asset2","TAX2",25000000, 5, "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"]
+    
+    // Javascript VM
+    // [86438967,"Test Asset","TAX",500, 10, "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"]
     function mint(
         uint256 tokenId, 
         string memory description, 
@@ -161,14 +133,14 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
     ) external {
         _safeMint(msg.sender, tokenId);
         // create an ERC20 Smart contract and assign the shares to issuer
-        ShareContract shareContract = new ShareContract(
-            description,
-            symbol,
-            totalSupply,
-            issuingPrice,
-            issuer
-        );
-        shares[tokenId] = shareContract;
+        // ShareContract shareContract = new ShareContract(
+        //     description,
+        //     symbol,
+        //     totalSupply,
+        //     issuingPrice,
+        //     issuer
+        // );
+        // shares[tokenId] = shareContract;
     }
 
     // function transferShares(uint256 tokenId, address recipient, uint256 amount) external {

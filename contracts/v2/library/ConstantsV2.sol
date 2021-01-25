@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 import { OrderModelV2 } from './OrderModelV2.sol';
-import "./openzeppelin/SafeMath.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.3.0/contracts/math/SafeMath.sol";
 
 library ConstantsV2 {
     using SafeMath for uint256;
