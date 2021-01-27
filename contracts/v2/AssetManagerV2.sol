@@ -2,13 +2,51 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/introspection//ERC165.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "./ShareContract.sol";
-import "./library/AssetModelV2.sol";
 import "./library/OrderModelV2.sol";
 import "./library/ConstantsV2.sol";
 
-contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
+contract AssetManagerV2 is ERC165, IERC721 {
+    using SafeMath for uint256;
+    using Address for address;
+    // Equals to `bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"))`
+    // which can be also obtained as `IERC721Receiver(0).onERC721Received.selector`
+    bytes4 private   constant _ERC721_RECEIVED = 0x150b7a02;
+    
+    // Mapping from token ID to index of the owner tokens list 
+    mapping(uint256 => uint256) internal ownedTokensIndex; 
+    //Mapping from token id to position in the allTokens array 
+    mapping(uint256 => uint256) internal allTokensIndex;
+    
+    // Mapping address to the number of tokens owned
+    mapping(address => uint256) balances;
+    
+    // all tokens array
+    uint256[] internal allTokens;
+    
+    // Mapping of address to the list of tokens owned
+    mapping (address => uint256[]) internal ownedTokens;
+    
+    // Mapping of tokens to the owner's address
+    mapping (uint256 => address) internal tokenOwner;
+
+    // how many tokens owned by address
+    mapping (address => uint256) internal ownedTokensCount;
+
+    // total supply of tokens
+    uint256 totalSupply_;
+
+
+    string private _baseURI;
+    bytes4 private constant _INTERFACE_ID_ERC721 = 0x80ac58cd;
+    bytes4 private constant _INTERFACE_ID_ERC721_METADATA = 0x5b5e139f;
+    bytes4 private constant _INTERFACE_ID_ERC721_ENUMERABLE = 0x780e9d63;
+
+    
     mapping(uint256 => ShareContract) shares;
 
     ShareContract wallet;
@@ -18,18 +56,105 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
 
     // Store All Orders. Key is hash of keys
     mapping(bytes32 => OrderModelV2.SortedKey[]) filtered;
-    mapping(address => OrderModelV2.SortedKey[]) userOrders;
 
     address owner;
 
     // store xether that is tied down by a buy order, key is address
     mapping(address => uint256) escrow;
+    
+    // Token name
+    string private _name;
 
-    constructor() public {
+    // Token symbol
+    string private _symbol;
+
+    function _safeMint(address _to, uint256 tokenId) private returns (bool) { 
+        require(tokenOwner[tokenId] == address(0), 'Token Already Minted');
+        
+        totalSupply_ = totalSupply_.add(1); 
+        balances[_to] = balances[_to].add(1); 
+        
+        allTokensIndex[tokenId] = allTokens.length;
+        allTokens.push(tokenId);
+        
+        ownedTokens[_to].push(tokenId);
+        tokenOwner[tokenId] = _to;
+        
+        ownedTokensIndex[tokenId] = ownedTokensCount[_to];
+        ownedTokensCount[_to] = ownedTokensCount[_to].add(1);
+        // Transfer(address(0), _to, 1); 
+        require(_checkOnERC721Received(address(0), _to, tokenId, ''), "ERC721: transfer to non ERC721Receiver implementer");
+        return true; 
+    } 
+    
+    function mint(
+        uint256 tokenId,
+        string calldata symbol,
+        uint256 totalSupply,
+        uint256 issuingPrice,
+        address issuer
+    ) external {
+        require(issuer != address(0));
+        require(owner == msg.sender);
+        _safeMint(msg.sender, tokenId);
+        // create an ERC20 Smart contract and assign the shares to issuer
+        ShareContract shareContract = new ShareContract(
+            symbol,
+            totalSupply,
+            issuingPrice,
+            issuer
+        );
+        shares[tokenId] = shareContract;
+    }    
+    
+    constructor (string memory name_, string memory symbol_) public {
+        _name = name_;
+        _symbol = symbol_;
+
+        // register the supported interfaces to conform to ERC721 via ERC165
+        _registerInterface(_INTERFACE_ID_ERC721);
+        _registerInterface(_INTERFACE_ID_ERC721_METADATA);
+        _registerInterface(_INTERFACE_ID_ERC721_ENUMERABLE);
+        
         owner = msg.sender;
-        wallet = new ShareContract("Tether Token", "WALLET", 2**250, 1, msg.sender);
+        wallet = new ShareContract("WALLET", 2**250, 1, msg.sender);
     }
-
+    
+    function approve(address to, uint256 tokenId) public override {
+        //TBD
+    }
+    
+    function getApproved(uint256 tokenId) public view override returns (address) {
+        //TBD
+    }
+    
+    function isApprovedForAll(address owner_, address operator) public view override returns (bool) {
+        // TBD
+    }
+    
+    function ownerOf(uint256 tokenId) public view override returns (address) {
+        // TBD
+    }
+    
+    function transferFrom(address from, address to, uint256 tokenId) public virtual override {
+        // TBD
+    }
+    
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) public virtual override {
+        // TBD
+    }
+    
+    function setApprovalForAll(address operator, bool approved) public virtual override {
+        // TBD
+    }
+    
+    function safeTransferFrom(address from, address to, uint256 tokenId) public virtual override {
+    }
+    
+    function balanceOf(address owner_) public view override returns (uint256) {
+        return balances[owner_];
+    }
+    
     function walletBalance(address userAddress) external view returns (uint256) {
         return wallet.allowance(userAddress, address(this));
     }
@@ -39,65 +164,107 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         return shareContract.allowance(userAddress, address(this));
     }
 
-    function postOrder(OrderModelV2.OrderRequest calldata or) external {
-        require(or.tokenId > 0);
-        require(or.amount > 0);
-        require(or.price > 0);
-
+    function buy(bytes32 orderKey) external {
+        address buyer = msg.sender;
+        OrderModelV2.Order memory or = orders[orderKey];
+        require(or.amountRemaining > 0, 'FN');
+        require(or.marketType == 1, 'SM');
+        require(or.seller != buyer, 'SAS');
+        // check that buyer have enough money to buy 
+        uint256 totalCost = or.amountRemaining.mul(or.price);
+        uint256 buyerNgncBalance = wallet.allowance(buyer, address(this));
+        if (buyerNgncBalance >= totalCost) {
+            ShareContract shareContract = shares[or.tokenId];
+            // update escrows
+            if(shareContract.transferFrom(owner, or.seller, or.amountRemaining)) {
+                shareContract.allow(or.seller, or.amountRemaining);
+            } else {
+                revert('NE');
+            }               
+            
+            if(wallet.transferFrom(buyer, or.seller, totalCost)) {
+                // Allow this contract to spend on seller's behalf
+                wallet.allow(or.seller, totalCost);
+                
+                if(shareContract.transferFrom(or.seller, buyer, or.amountRemaining)) {
+                    // Allow this contract to spend on buyer's behalf
+                    shareContract.allow(buyer, or.amountRemaining);
+                }
+            } else {
+                revert('N');
+            }
+            or.amountRemaining = 0;
+            _filterMatchedOrder(or);
+            orders[or.key.key] = or;
+        } else {
+            revert("L");
+        }
+    }
+    
+    function postOrder(
+        uint256 orderType,
+        uint256 orderStrategy,
+        uint256 amount,
+        uint256 price,
+        uint256 tokenId,
+        uint256 goodUntil,
+        bytes32 key,
+        uint256 marketType
+    ) external {
+        require(orders[key].tokenId == 0, 'SK');
         address seller;
         address buyer;
-        if (or.orderType == OrderModelV2.OrderType.BUY) {
+        if (orderType == ConstantsV2.OrderTypeBuy) {
             buyer = msg.sender;
             seller = address(0);
-            uint256 totalCost = or.amount.mul(or.price);
+            uint256 totalCost = amount.mul(price);
             uint256 buyerNgncBalance = wallet.allowance(buyer, address(this));
 
             if (buyerNgncBalance >= totalCost) {
                 // deduct totalCost from wallet
-                _updateWalletBalance(buyer, totalCost, false);
+                wallet.transferFrom(buyer, owner, totalCost);
                 // update escrow
                 escrow[buyer] = escrow[buyer].add(totalCost);
             } else {
-                revert("LB");
+                revert("L");
             }
-        } else if (or.orderType == OrderModelV2.OrderType.SELL) {
+        } else if (orderType == ConstantsV2.OrderTypeSell) {
             buyer = address(0);
             seller = msg.sender;
             //check that you have the asset you want to sell
-            ShareContract shareContract = shares[or.tokenId];
+            ShareContract shareContract = shares[tokenId];
             uint256 sellerShares = shareContract.allowance(seller, address(this));
 
-            if (sellerShares < or.amount) {
-                revert("NEA");
+            if (sellerShares < amount) {
+                revert("NA");
             } else {
                 // escrow it
-                if(shareContract.transferFrom(seller, owner, or.amount)) {
-                    shareContract.allow(owner, or.amount);
+                if(shareContract.transferFrom(seller, owner, amount)) {
+                    shareContract.allow(owner, amount);
                 }
             }
         }
 
-        OrderModelV2.SortedKey memory sortedKey = OrderModelV2.SortedKey({ key: or.key, date: block.timestamp });
+        OrderModelV2.SortedKey memory sortedKey = OrderModelV2.SortedKey({ key: key, date: block.timestamp });
 
         OrderModelV2.Order memory dbOrder = OrderModelV2.Order({
             key: sortedKey,
-            orderType: or.orderType,
-            orderStrategy: or.orderStrategy,
+            orderType: orderType,
+            orderStrategy: orderStrategy,
             seller: seller,
             buyer: buyer,
-            tokenId: or.tokenId,
-            amountRemaining: or.amount,
-            originalAmount: or.amount,
-            price: or.price,
-            status: OrderModelV2.OrderStatus.NEW,
-            orderDate: block.timestamp,
-            statusDate: block.timestamp,
-            goodUntil: or.goodUntil
+            tokenId: tokenId,
+            amountRemaining: amount,
+            originalAmount: amount,
+            price: price,
+            status: ConstantsV2.OrderStatusNew,
+            goodUntil: goodUntil,
+            marketType: marketType
         });
 
-        orders[or.key] = dbOrder;
+        orders[key] = dbOrder;
 
-        _populateFilteredOrders(dbOrder.key, dbOrder.orderType, dbOrder.buyer, dbOrder.seller);
+        _populateFilteredOrders(dbOrder.key, dbOrder.orderType);
 
         _matchOrder(dbOrder);
     }
@@ -106,45 +273,24 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         return orders[key];
     }
 
-    function mint(AssetModelV2.AssetRequest calldata ar) external {
-        bytes memory b = bytes(ar.description);
-        bytes memory b1 = bytes(ar.symbol);
-        require(b.length > 0);
-        require(b1.length > 0);
-        require(ar.tokenId > 0);
-        require(ar.totalSupply > 0);
-        require(ar.issuer != address(0));
-        require(owner == msg.sender);
-        _safeMint(msg.sender, ar.tokenId);
-        // create an ERC20 Smart contract and assign the shares to issuer
-        ShareContract shareContract = new ShareContract(
-            ar.description,
-            ar.symbol,
-            ar.totalSupply,
-            ar.issuingPrice,
-            ar.issuer
-        );
-        shares[ar.tokenId] = shareContract;
-    }
+    // function transferShares(uint256 tokenId, address recipient, uint256 amount) external {
+    //     shares[tokenId].transferFrom(msg.sender, recipient, amount);
+    //     // Allow this contract to spend on recipients behalf
+    //     shares[tokenId].allow(recipient, amount);
+    // }
 
-    function transferShares(uint256 tokenId, address recipient, uint256 amount) external {
-        shares[tokenId].transferFrom(msg.sender, recipient, amount);
-        // Allow this contract to spend on recipients behalf
-        shares[tokenId].allow(recipient, amount);
-    }
+    // function transferTokenOwnership(uint256 tokenId, address recipient) external {
+    //     uint256 sharesOwned = shares[tokenId].allowance(
+    //         msg.sender,
+    //         address(this)
+    //     );
 
-    function transferTokenOwnership(uint256 tokenId, address recipient) external {
-        uint256 sharesOwned = shares[tokenId].allowance(
-            msg.sender,
-            address(this)
-        );
-
-        // first transfer the shares owned by the caller in tokenId
-        shares[tokenId].transferFrom(msg.sender, recipient, sharesOwned);
-        shares[tokenId].allow(recipient, sharesOwned);
-        // then transfer ownership of the token
-        safeTransferFrom(msg.sender, recipient, tokenId);
-    }
+    //     // first transfer the shares owned by the caller in tokenId
+    //     shares[tokenId].transferFrom(msg.sender, recipient, sharesOwned);
+    //     shares[tokenId].allow(recipient, sharesOwned);
+    //     // then transfer ownership of the token
+    //     safeTransferFrom(msg.sender, recipient, tokenId);
+    // }
 
     function fundWallet(address recipient, uint256 amount) external {
         require(owner == msg.sender, 'OF');
@@ -153,51 +299,19 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         wallet.allow(recipient, amount);
     }
 
-    function tokenShares(uint256 tokenId) external view returns (AssetModelV2.TokenShares memory) {
-        address tokenOwner = ownerOf(tokenId);
-
-        ShareContract shareContract = shares[tokenId];
-        (
-            address sharesContract,
-            string memory description,
-            string memory symbol,
-            uint256 totalSupply,
-            uint256 issuingPrice,
-            address issuer
-        ) = shareContract.details();
-
-        return AssetModelV2.TokenShares({
-                tokenId: tokenId,
-                owner: tokenOwner,
-                sharesContract: sharesContract,
-                description: description,
-                symbol: symbol,
-                totalSupply: totalSupply,
-                issuingPrice: issuingPrice,
-                issuer: issuer
-            });
-    }
-
-    function _updateWalletBalance(address recipient, uint256 amount, bool add) internal {
-        if (add) {
-            wallet.transferFrom(owner, recipient, amount);
-            // Allow this contract to spend on recipients behalf
-            wallet.allow(recipient, amount);
-        } else {
-            wallet.transferFrom(recipient, owner, amount);
-        }
+    function tokenShares(uint256 tokenId) external view returns (uint256, address, address, string memory, string memory, uint256, uint256, address) {
+        return shares[tokenId].details(tokenId, tokenOwner[tokenId]);
     }
 
     function _populateFilteredOrders(
         OrderModelV2.SortedKey memory key,
-        OrderModelV2.OrderType orderType, address buyer, address seller) internal {
+        uint256 orderType
+    ) internal {
         filtered[ConstantsV2.PENDING_ORDERS_KEY].push(key);
-        if (orderType == OrderModelV2.OrderType.BUY) {
+        if (orderType == ConstantsV2.OrderTypeBuy) {
             filtered[ConstantsV2.BUY_ORDERS_KEY].push(key);
-            userOrders[buyer].push(key);
         } else {
             filtered[ConstantsV2.SELL_ORDERS_KEY].push(key);
-            userOrders[seller].push(key);
         }
     }
 
@@ -225,23 +339,25 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
             } else if (toMatch.buyer != address(0) && matchingOrder.seller != address(0)) {
                 buyerIsSeller = toMatch.buyer == matchingOrder.seller;
             }
+            bool sameMarketType = toMatch.marketType == matchingOrder.marketType;
 
             bool shouldProcess = tokenIdEquals &&
-                toMatch.status == OrderModelV2.OrderStatus.NEW &&
+                toMatch.status == ConstantsV2.OrderStatusNew &&
                 !sameType &&
+                sameMarketType &&
                 !buyerIsSeller;
 
             if (shouldProcess) {
                 OrderModelV2.Order memory buyOrder;
                 OrderModelV2.Order memory sellOrder;
                 ConstantsV2.Values memory returnValues;
-                if (matchingOrder.orderType == OrderModelV2.OrderType.BUY) {
+                if (matchingOrder.orderType == ConstantsV2.OrderTypeBuy) {
                     buyOrder = matchingOrder;
                     sellOrder = toMatch;
                     returnValues = _processOrder(buyOrder, sellOrder);
                     matched = returnValues.matched;
                     matchingOrder = orders[buyOrder.key.key];
-                } else if (matchingOrder.orderType == OrderModelV2.OrderType.SELL) {
+                } else if (matchingOrder.orderType == ConstantsV2.OrderTypeSell) {
                     sellOrder = matchingOrder;
                     buyOrder = toMatch;
                     returnValues = _processOrder(buyOrder, sellOrder);
@@ -249,17 +365,19 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
                     matchingOrder = orders[sellOrder.key.key];
                 }
 
-                if (buyOrder.status == OrderModelV2.OrderStatus.MATCHED || sellOrder.status == OrderModelV2.OrderStatus.MATCHED) {
+                if (buyOrder.status == ConstantsV2.OrderStatusMatched || sellOrder.status == ConstantsV2.OrderStatusMatched) {
                     // add totalCost back to wallet and remove from escrow
                     uint256 totalCost = returnValues.toBuy.mul(buyOrder.price);
                     uint256 toSeller = totalCost;
-                    if (sellOrder.orderStrategy != OrderModelV2.OrderStrategy.ALL_OR_NONE) {
+                    if (sellOrder.orderStrategy != ConstantsV2.OrderStrategyAON) {
                         toSeller = returnValues.toSell.mul(sellOrder.price);
                     }
 
                     // update escrows                    
                     escrow[buyOrder.buyer] = escrow[buyOrder.buyer].sub(totalCost);
-                    _updateWalletBalance(buyOrder.buyer, totalCost, true);
+                    wallet.transferFrom(owner, buyOrder.buyer, totalCost);
+                    // Allow this contract to spend on recipients behalf
+                    wallet.allow(buyOrder.buyer, totalCost);                    
                     ShareContract shareContract = shares[buyOrder.tokenId];
                     if(shareContract.transferFrom(owner, sellOrder.seller, returnValues.toBuy)) {
                         shareContract.allow(sellOrder.seller, returnValues.toBuy);
@@ -307,17 +425,17 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         if(buyOrder.price >= sellOrder.price && (returnValues.buyExpired == false && returnValues.sellExpired == false)) {
             if(buyerAmount == sellerAmount) {
                 _processOrderSameAmount(returnValues, buyOrder, sellOrder);
-            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy != OrderModelV2.OrderStrategy.ALL_OR_NONE) {
+            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy != ConstantsV2.OrderStrategyAON) {
                 _processOrderBuyPartial(returnValues, buyOrder, sellOrder);
-            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy != OrderModelV2.OrderStrategy.ALL_OR_NONE) {
+            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy != ConstantsV2.OrderStrategyAON) {
                 _processOrderSellPartial(returnValues, buyOrder, sellOrder);
             }
-        } else if(sellOrder.orderStrategy == OrderModelV2.OrderStrategy.MARKET_ORDER && returnValues.sellExpired == false) {
+        } else if(sellOrder.orderStrategy == ConstantsV2.OrderStrategyMO && returnValues.sellExpired == false) {
             if(buyerAmount == sellerAmount) {
                 _processOrderSameAmount(returnValues, buyOrder, sellOrder);
-            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy != OrderModelV2.OrderStrategy.ALL_OR_NONE) {
+            } else if (buyerAmount > sellerAmount && buyOrder.orderStrategy != ConstantsV2.OrderStrategyAON) {
                 _processOrderBuyPartial(returnValues, buyOrder, sellOrder);
-            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy != OrderModelV2.OrderStrategy.ALL_OR_NONE) {
+            } else if (buyerAmount < sellerAmount && sellOrder.orderStrategy != ConstantsV2.OrderStrategyAON) {
                 _processOrderSellPartial(returnValues, buyOrder, sellOrder);
             }
         }
@@ -375,7 +493,21 @@ contract AssetManagerV2 is ERC721("NSE Art Exchange", "ARTX") {
         }
 
         filtered[ConstantsV2.MATCHED_ORDERS_KEY].push(order.key);
-        order.status = OrderModelV2.OrderStatus.MATCHED;
-        order.statusDate = block.timestamp;
+        order.status = ConstantsV2.OrderStatusMatched;
     }
+    
+    function _checkOnERC721Received(address from, address to, uint256 tokenId, bytes memory _data) private returns (bool) {
+        if (!to.isContract()) {
+            return true;
+        }
+        bytes memory returndata = to.functionCall(abi.encodeWithSelector(
+            IERC721Receiver(to).onERC721Received.selector,
+            msg.sender,
+            from,
+            tokenId,
+            _data
+        ), "ERC721: transfer to non ERC721Receiver implementer");
+        bytes4 retval = abi.decode(returndata, (bytes4));
+        return (retval == _ERC721_RECEIVED);
+    }    
 }
