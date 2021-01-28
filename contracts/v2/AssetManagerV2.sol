@@ -5,7 +5,6 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/introspection//ERC165.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
 import "./ShareContract.sol";
 import "./library/OrderModelV2.sol";
 import "./library/ConstantsV2.sol";
@@ -89,9 +88,9 @@ contract AssetManagerV2 is ERC165, IERC721 {
     // Token symbol
     string private _symbol;
     
-    constructor (string memory name_, string memory symbol_) public {
-        _name = name_;
-        _symbol = symbol_;
+    constructor () public {
+        _name = "NSE Art Exchange";
+        _symbol = "ARTX";
 
         // register the supported interfaces to conform to ERC721 via ERC165
         _registerInterface(_INTERFACE_ID_ERC721);
