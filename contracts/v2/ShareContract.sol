@@ -8,19 +8,29 @@ contract ShareContract is ERC20 {
 
     uint256 private _issuingPrice;
     address _issuer;
+    address assetManagerV2;
 
     constructor (
         string memory symbol,
         uint256 totalSupply,
         uint256 price,
-        address owner
+        address owner,
+        uint8 decimals
     ) ERC20('TokenShares', symbol) public {
         // constructor
-        address assetManagerV2 = msg.sender;
+        assetManagerV2 = msg.sender;
         _mint(owner, totalSupply);
         _approve(owner, assetManagerV2, totalSupply);
         _issuingPrice = price;
         _issuer = owner;
+        _setupDecimals(decimals);
+    }
+    
+    function mintToken(address owner, uint256 amount) public {
+        require(assetManagerV2 == msg.sender, 'MBAMV2');
+        uint256 currentBalance = allowance(owner, assetManagerV2);
+        _mint(owner, amount);
+        _approve(owner, assetManagerV2, amount.add(currentBalance));
     }
 
     function issuingPrice() public view returns (uint256) {
@@ -32,7 +42,7 @@ contract ShareContract is ERC20 {
     }
 
     function allow(address owner, uint256 amount) public {
-        address assetManagerV2 = msg.sender; // spender
+        require(assetManagerV2 == msg.sender, 'MBAMV2');
         uint256 currentBalance = allowance(owner, assetManagerV2);
         _approve(owner, assetManagerV2, amount.add(currentBalance));
     }

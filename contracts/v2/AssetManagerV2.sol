@@ -11,34 +11,55 @@ import "./library/OrderModelV2.sol";
 import "./library/ConstantsV2.sol";
 
 contract AssetManagerV2 is ERC165, IERC721 {
+    /**
+     * @dev Emitted when `tokenId` token is transferred from `from` to `to`.
+     */
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+
+    /**
+     * @dev Emitted when `owner` enables `approved` to manage the `tokenId` token.
+     */
+    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+
+    /**
+     * @dev Emitted when `owner` enables or disables (`approved`) `operator` to manage all of its assets.
+     */
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+    
     using SafeMath for uint256;
     using Address for address;
     // Equals to `bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"))`
     // which can be also obtained as `IERC721Receiver(0).onERC721Received.selector`
-    bytes4 private   constant _ERC721_RECEIVED = 0x150b7a02;
+    bytes4 private constant _ERC721_RECEIVED = 0x150b7a02;
     
     // Mapping from token ID to index of the owner tokens list 
-    mapping(uint256 => uint256) internal ownedTokensIndex; 
+    mapping(uint256 => uint256) private ownedTokensIndex; 
     //Mapping from token id to position in the allTokens array 
-    mapping(uint256 => uint256) internal allTokensIndex;
+    mapping(uint256 => uint256) private allTokensIndex;
     
     // Mapping address to the number of tokens owned
     mapping(address => uint256) balances;
     
     // all tokens array
-    uint256[] internal allTokens;
+    uint256[] private allTokens;
     
     // Mapping of address to the list of tokens owned
-    mapping (address => uint256[]) internal ownedTokens;
+    mapping (address => uint256[]) private ownedTokens;
     
     // Mapping of tokens to the owner's address
-    mapping (uint256 => address) internal tokenOwner;
+    mapping (uint256 => address) private tokenOwner;
 
     // how many tokens owned by address
-    mapping (address => uint256) internal ownedTokensCount;
-
+    mapping (address => uint256) private ownedTokensCount;
+    
+    // token uris
+    mapping(uint256 => string ) tokenURIs;
+    
     // total supply of tokens
     uint256 totalSupply_;
+    
+    mapping (uint256 => address) private _tokenApprovals;
+    mapping (address => mapping (address => bool)) private _operatorApprovals;
 
 
     string private _baseURI;
@@ -47,17 +68,17 @@ contract AssetManagerV2 is ERC165, IERC721 {
     bytes4 private constant _INTERFACE_ID_ERC721_ENUMERABLE = 0x780e9d63;
 
     
-    mapping(uint256 => ShareContract) shares;
+    mapping(uint256 => ShareContract) private shares;
 
-    ShareContract wallet;
+    ShareContract private wallet;
 
     // Store All Orders. Key is OrderModelV2.Order Key
-    mapping(bytes32 => OrderModelV2.Order) orders;
+    mapping(bytes32 => OrderModelV2.Order) private orders;
 
     // Store All Orders. Key is hash of keys
-    mapping(bytes32 => OrderModelV2.SortedKey[]) filtered;
+    mapping(bytes32 => OrderModelV2.SortedKey[]) private filtered;
 
-    address owner;
+    address private owner;
 
     // store xether that is tied down by a buy order, key is address
     mapping(address => uint256) escrow;
@@ -67,45 +88,6 @@ contract AssetManagerV2 is ERC165, IERC721 {
 
     // Token symbol
     string private _symbol;
-
-    function _safeMint(address _to, uint256 tokenId) private returns (bool) { 
-        require(tokenOwner[tokenId] == address(0), 'Token Already Minted');
-        
-        totalSupply_ = totalSupply_.add(1); 
-        balances[_to] = balances[_to].add(1); 
-        
-        allTokensIndex[tokenId] = allTokens.length;
-        allTokens.push(tokenId);
-        
-        ownedTokens[_to].push(tokenId);
-        tokenOwner[tokenId] = _to;
-        
-        ownedTokensIndex[tokenId] = ownedTokensCount[_to];
-        ownedTokensCount[_to] = ownedTokensCount[_to].add(1);
-        // Transfer(address(0), _to, 1); 
-        require(_checkOnERC721Received(address(0), _to, tokenId, ''), "ERC721: transfer to non ERC721Receiver implementer");
-        return true; 
-    } 
-    
-    function mint(
-        uint256 tokenId,
-        string calldata symbol,
-        uint256 totalSupply,
-        uint256 issuingPrice,
-        address issuer
-    ) external {
-        require(issuer != address(0));
-        require(owner == msg.sender);
-        _safeMint(msg.sender, tokenId);
-        // create an ERC20 Smart contract and assign the shares to issuer
-        ShareContract shareContract = new ShareContract(
-            symbol,
-            totalSupply,
-            issuingPrice,
-            issuer
-        );
-        shares[tokenId] = shareContract;
-    }    
     
     constructor (string memory name_, string memory symbol_) public {
         _name = name_;
@@ -117,23 +99,67 @@ contract AssetManagerV2 is ERC165, IERC721 {
         _registerInterface(_INTERFACE_ID_ERC721_ENUMERABLE);
         
         owner = msg.sender;
-        wallet = new ShareContract("WALLET", 2**250, 1, msg.sender);
+        wallet = new ShareContract("WALLET", 0, 1, msg.sender, 0);
     }
     
+    function name() public view returns (string memory) {
+        return _name;
+    }
+
+    function symbol() public view returns (string memory) {
+        return _symbol;
+    }
+    
+    function tokenURI(uint256 tokenId) external view returns (string memory) {
+        return tokenURIs[tokenId];
+    }
+    
+    function mint(
+        uint256 tokenId,
+        string calldata tokenSymbol,
+        uint256 totalSupply,
+        uint256 issuingPrice,
+        address issuer,
+        string calldata uri
+    ) external {
+        require(issuer != address(0));
+        require(owner == msg.sender);
+        _safeMint(msg.sender, tokenId);
+        tokenURIs[tokenId] = uri;
+        // create an ERC20 Smart contract and assign the shares to issuer
+        ShareContract shareContract = new ShareContract(
+            tokenSymbol,
+            totalSupply,
+            issuingPrice,
+            issuer,
+            0
+        );
+        shares[tokenId] = shareContract;
+    }        
+    
     function approve(address to, uint256 tokenId) public override {
-        //TBD
+        address ownerOf_ = ownerOf(tokenId);
+        require(to != ownerOf_, "ERC721: approval to current owner");
+
+        require(msg.sender == ownerOf_ || isApprovedForAll(ownerOf_, msg.sender),
+            "ERC721: approve caller is not owner nor approved for all"
+        );
+
+        _approve(to, tokenId);
     }
     
     function getApproved(uint256 tokenId) public view override returns (address) {
-        //TBD
+        require(tokenOwner[tokenId] != address(0), "ERC721: approved query for nonexistent token");
+
+        return _tokenApprovals[tokenId];
     }
     
     function isApprovedForAll(address owner_, address operator) public view override returns (bool) {
-        // TBD
+        return _operatorApprovals[owner_][operator];
     }
     
     function ownerOf(uint256 tokenId) public view override returns (address) {
-        // TBD
+        return tokenOwner[tokenId];
     }
     
     function transferFrom(address from, address to, uint256 tokenId) public virtual override {
@@ -145,7 +171,9 @@ contract AssetManagerV2 is ERC165, IERC721 {
     }
     
     function setApprovalForAll(address operator, bool approved) public virtual override {
-        // TBD
+        require(operator != msg.sender, "ERC721: approve to caller");
+
+        _operatorApprovals[msg.sender][operator] = approved;
     }
     
     function safeTransferFrom(address from, address to, uint256 tokenId) public virtual override {
@@ -218,11 +246,9 @@ contract AssetManagerV2 is ERC165, IERC721 {
             buyer = msg.sender;
             seller = address(0);
             uint256 totalCost = amount.mul(price);
-            uint256 buyerNgncBalance = wallet.allowance(buyer, address(this));
+            uint256 buyerNgncBalance = wallet.balanceOf(buyer) - escrow[buyer];
 
             if (buyerNgncBalance >= totalCost) {
-                // deduct totalCost from wallet
-                wallet.transferFrom(buyer, owner, totalCost);
                 // update escrow
                 escrow[buyer] = escrow[buyer].add(totalCost);
             } else {
@@ -294,9 +320,7 @@ contract AssetManagerV2 is ERC165, IERC721 {
 
     function fundWallet(address recipient, uint256 amount) external {
         require(owner == msg.sender, 'OF');
-        wallet.transferFrom(msg.sender, recipient, amount);
-        // Allow this contract to spend on recipients behalf
-        wallet.allow(recipient, amount);
+        wallet.mintToken(recipient, amount);
     }
 
     function tokenShares(uint256 tokenId) external view returns (uint256, address, address, string memory, string memory, uint256, uint256, address) {
@@ -373,11 +397,10 @@ contract AssetManagerV2 is ERC165, IERC721 {
                         toSeller = returnValues.toSell.mul(sellOrder.price);
                     }
 
-                    // update escrows                    
+                    // update escrow                    
                     escrow[buyOrder.buyer] = escrow[buyOrder.buyer].sub(totalCost);
-                    wallet.transferFrom(owner, buyOrder.buyer, totalCost);
-                    // Allow this contract to spend on recipients behalf
-                    wallet.allow(buyOrder.buyer, totalCost);                    
+
+                    // send the shares back to seller from escrow (owner)
                     ShareContract shareContract = shares[buyOrder.tokenId];
                     if(shareContract.transferFrom(owner, sellOrder.seller, returnValues.toBuy)) {
                         shareContract.allow(sellOrder.seller, returnValues.toBuy);
@@ -510,4 +533,29 @@ contract AssetManagerV2 is ERC165, IERC721 {
         bytes4 retval = abi.decode(returndata, (bytes4));
         return (retval == _ERC721_RECEIVED);
     }    
+    
+    function _safeMint(address _to, uint256 tokenId) private returns (bool) { 
+        require(tokenOwner[tokenId] == address(0), 'Token Already Minted');
+        
+        totalSupply_ = totalSupply_.add(1); 
+        balances[_to] = balances[_to].add(1); 
+        
+        allTokensIndex[tokenId] = allTokens.length;
+        allTokens.push(tokenId);
+        
+        ownedTokens[_to].push(tokenId);
+        tokenOwner[tokenId] = _to;
+        
+        ownedTokensIndex[tokenId] = ownedTokensCount[_to];
+        ownedTokensCount[_to] = ownedTokensCount[_to].add(1);
+        require(_checkOnERC721Received(address(0), _to, tokenId, ''), "ERC721: transfer to non ERC721Receiver implementer");
+        
+        emit Transfer(address(0), _to, tokenId);
+        return true; 
+    }  
+    
+    function _approve(address to, uint256 tokenId) private {
+        _tokenApprovals[tokenId] = to;
+    }    
+
 }
