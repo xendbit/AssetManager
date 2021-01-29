@@ -10,6 +10,8 @@ import "./library/OrderModelV2.sol";
 import "./library/ConstantsV2.sol";
 
 contract AssetManagerV2 is ERC165, IERC721 {
+    // emitted when an asset is bought or sold
+    event OrderChanged(bytes32 key, uint256 newStatus, uint256 amountRemaining);
     /**
      * @dev Emitted when `tokenId` token is transferred from `from` to `to`.
      */
@@ -245,7 +247,7 @@ contract AssetManagerV2 is ERC165, IERC721 {
             buyer = msg.sender;
             seller = address(0);
             uint256 totalCost = amount.mul(price);
-            uint256 buyerNgncBalance = wallet.balanceOf(buyer) - escrow[buyer];
+            uint256 buyerNgncBalance = wallet.allowance(buyer, address(this)) - escrow[buyer];
 
             if (buyerNgncBalance >= totalCost) {
                 // update escrow
@@ -516,6 +518,7 @@ contract AssetManagerV2 is ERC165, IERC721 {
 
         filtered[ConstantsV2.MATCHED_ORDERS_KEY].push(order.key);
         order.status = ConstantsV2.OrderStatusMatched;
+        emit OrderChanged(order.key.key, order.status, order.amountRemaining);
     }
     
     function _checkOnERC721Received(address from, address to, uint256 tokenId, bytes memory _data) private returns (bool) {
@@ -557,4 +560,8 @@ contract AssetManagerV2 is ERC165, IERC721 {
         _tokenApprovals[tokenId] = to;
     }    
 
+    function orderChanged(bytes32 key) private {
+        OrderModelV2.Order memory order = orders[key];
+        emit OrderChanged(key, order.status, order.amountRemaining);
+    }
 }
