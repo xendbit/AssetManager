@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 import { OrderModelV2 } from './OrderModelV2.sol';
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.3.0/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 library ConstantsV2 {
     using SafeMath for uint256;
@@ -11,6 +11,24 @@ library ConstantsV2 {
     bytes32 constant SELL_ORDERS_KEY = keccak256(bytes("SELL_ORDERS"));
     bytes32 constant MATCHED_ORDERS_KEY = keccak256(bytes("MATCHED_ORDERS"));
     bytes32 constant DELETED_ORDERS_KEY = keccak256(bytes("DELETED_ORDERS"));
+    
+    uint256 constant OrderTypeBuy = 0;
+    uint256 constant OrderTypeSell = 1;
+    
+    uint256 constant OrderStrategyGTC = 0;
+    uint256 constant OrderStrategyAON = 1;
+    uint256 constant OrderStrategyGTD = 2;
+    uint256 constant OrderStrategyGTM = 3;
+    uint256 constant OrderStrategyMO = 4;
+    
+    uint256 constant MarketTypePrimary = 0;
+    uint256 constant MarketTypeSecondary = 1;
+    
+    uint256 constant OrderStatusNew = 0;
+    uint256 constant OrderStatusMatched = 1;
+    uint256 constant OrderStatusDeleted = 2;
+    uint256 constant OrderStatusExpiired = 3;
+    
 
     uint256 constant MAX_ORDERS_TO_PROCESS = 1000;
 

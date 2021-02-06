@@ -2,8 +2,8 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma experimental ABIEncoderV2;
 
-import "./v2/library/openzeppelin/ERC20.sol";
-import "./v2/library/openzeppelin/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract NGNX is ERC20 {
     address private _owner;
